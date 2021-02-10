@@ -9,7 +9,7 @@ pip install -r requirements.txt -i https://pypi.douban.com/simple --default-time
 ## 2. 运行
 
 ```bash
-python hair_annotation.py
+python main.py
 ```
 
 ## 3. 如何调试自己对应的代码
