@@ -53,6 +53,17 @@ BINARY_AUTO = 1
 BINARY_DL = 2
 
 
+class HandleBlingThread(QThread):  # 步骤1.创建一个线程实例
+   # mysignal = pyqtSignal(tuple)  # 创建一个自定义信号，元组参数
+    def __init__(self):
+        super(HandleBlingThread, self).__init__()
+
+    def run(self):
+        a = (1, 2)
+        while True:
+            print('HandleBlingThread！！！')
+        # self.mysignal.emit(a)  # 发射自定义信号
+
 
 #图像标记类
 class Mark(QMainWindow):
@@ -61,6 +72,8 @@ class Mark(QMainWindow):
         uic.loadUi("test.ui",self)
 
         self.setFixedUI()
+
+        self.roiInf_corrected = None
 
         self.image_origin = None
         self.image_roi = None
@@ -185,6 +198,10 @@ class Mark(QMainWindow):
 
 
 
+        self.handleBlingThread = HandleBlingThread()  # 步骤2. 主线程连接子线
+        # self.my_thread.mysignal.connect(self.zhi)  # 自定义信号连接
+
+
     def buttonSaveEvent(self):
         curve = np.zeros_like(self.image_origin)
         temp = curve_plot(curve, self.result,distinguishValue=0,color1=(255,255,255),color2=(255,255,255))
@@ -222,7 +239,7 @@ class Mark(QMainWindow):
     # 鼠标点击事件
     def eventFilter(self,source, event):
         # 标注图鼠标响应
-        if source == self.labelImg:
+        if source == self.labelImg or source == self.labelImg_curve:
             # 滚轮————画笔透明度调整
             if event.type() == QEvent.Wheel:
                 whell_angle = event.angleDelta()
@@ -292,7 +309,6 @@ class Mark(QMainWindow):
                         #     y2 = y + w / 2 * sin(angle / 57.3)
                         #     self.result.append({'joints':[[x1,y1],[x2,y2]], 'rect': rect, 'box': box, 'width': rect[1][1], 'mid':getMidPoint([[x1,y1],[x2,y2]])})
                         # self.imshow()
-
                     elif event.button() == Qt.RightButton:
                         self.checkThisHair()
                         #self.handle_bone = False
@@ -313,6 +329,15 @@ class Mark(QMainWindow):
                         self.handle_index = min_idx
                         self.imshow()
                         pass
+
+                    #self.handleBlingThread.start()  # 步骤3 子线程开始执行run函数
+
+            if event.type()==QEvent.MouseMove:
+                [x, y] = [event.pos().x(), event.pos().y()]
+                if self.roiInf_corrected is not None:
+                    [x, y] = [round(x * self.roi_window / self.labelImg.width()),
+                                 round(y * self.roi_window / self.labelImg.width())]
+                self.imshowBling([x, y])
 
         # 缩略图鼠标响应
         if source == self.labelImg_roi:
@@ -381,6 +406,46 @@ class Mark(QMainWindow):
 
 
 
+
+
+
+
+
+    # 编辑点的闪烁效果————改成活动的细线标记
+    def imshowBling(self,mousePoint):
+        if len(self.result)>0 and self.handle_index!=-2:
+            if self.handle_bone==False:
+                return
+
+            [x,y] = self.result[self.handle_index]['joints'][-1]      # 获取最后一个点
+
+            if self.roiInf_corrected is not None:
+                x0, x1, y0, y1 = self.roiInf_corrected
+
+                    # [x, y] = [int(x0 + x * self.roi_window / self.labelImg.width()),
+                    #          int(y0 + y * self.roi_window / self.labelImg.width())]
+
+                x = round(x - x0)
+                y = round(y - y0)
+
+            temp_img = cv.line(self.label_img.copy(), (x, y), (mousePoint[0], mousePoint[1]), (0, 255, 255), 1, cv.LINE_4)       # 直接用opencv绘制细线
+
+            # temp = curve_plot(self.label_img,[self.result[self.handle_index]], 0,(0, 255, 0),(0, 255, 0),alpha=alpha,handle_diff=[self.roiInf_corrected[0],self.roiInf_corrected[2]])   # 仅对选中的一根毛发进行绘制
+            # self.label_img = temp['img']
+
+
+
+            img = cv.resize(temp_img, self.img_size)
+            qimg = QtGui.QImage(img, img.shape[1], img.shape[0],
+                        img.shape[1]*3, QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
+            self.labelImg.setPixmap(QtGui.QPixmap(qimg))
+
+
+
+
+
+
+
     def imshow(self,update=False,plot=True):
         self.label_img = self.getImage(update)
         temp = curve_plot(self.label_img, self.result, self.distinguishValue/self.downsample_ratio,(255, 0, 0),alpha=self.plot_alpha, roi=self.roiInf_corrected)
@@ -395,40 +460,22 @@ class Mark(QMainWindow):
             x0, x1, y0, y1 = self.roiInf_corrected
             # img = self.label_img[y0:y1, x0:x1, :]
 
+
         # 将常规绘图与handle_index绘图分开进行，重复调用一次curve_plot
-        curve = self.getBinary()[y0:y1, x0:x1]
+        curve = self.getBinary()[y0:y1, x0:x1]  # 得到二值图ROI
         if len(self.result)>0 and self.handle_index!=-2:
             if self.handle_bone==True:
-                alpha=1
+                alpha=1     # 未标完的毛发，始终呈不透明显示（可能透明化反而好点，存疑）
             else:
                 alpha=self.plot_alpha
-            temp = curve_plot(self.label_img,[self.result[self.handle_index]], 0,(0, 255, 0),(0, 255, 0),alpha=alpha,handle_diff=[self.roiInf_corrected[0],self.roiInf_corrected[2]])
+            temp = curve_plot(self.label_img,[self.result[self.handle_index]], 0,(0, 255, 0),(0, 255, 0),alpha=alpha,handle_diff=[self.roiInf_corrected[0],self.roiInf_corrected[2]])   # 仅对选中的一根毛发进行绘制
             self.label_img = temp['img']
             binary_temp = curve_plot(curve, [self.result[self.handle_index]], 0, (0, 255, 0), (0, 255, 0),
-                              alpha=1, handle_diff=[self.roiInf_corrected[0], self.roiInf_corrected[2]], handle_width=2)
+                              alpha=1, handle_diff=[self.roiInf_corrected[0], self.roiInf_corrected[2]], handle_width=2)        # 对二值图进行绘制
             curve = binary_temp['img']
 
 
 
-        # 绘制左图<?xml version="1.0" encoding="UTF-8"?>
-        # <ui version="4.0">
-        #  <widget name="__qt_fake_top_level">
-        #   <widget class="QLabel" name="label">
-        #    <property name="geometry">
-        #     <rect>
-        #      <x>610</x>
-        #      <y>200</y>
-        #      <width>61</width>
-        #      <height>41</height>
-        #     </rect>
-        #    </property>
-        #    <property name="text">
-        #     <string>数量</string>
-        #    </property>
-        #   </widget>
-        #  </widget>
-        #  <resources/>
-        # </ui>
         img = cv.resize(self.label_img, self.img_size)
         qimg = QtGui.QImage(img, img.shape[1], img.shape[0],
                     img.shape[1]*3, QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
@@ -735,7 +782,11 @@ class Mark(QMainWindow):
             self.handle_bone = False
             self.result.pop(self.handle_index)
             self.result_origin.pop(self.handle_index)
-            self.handle_index = -1
+
+            if len(self.result)==0:
+                self.handle_index = -2
+            else:
+                self.handle_index = -1
             self.imshow()
 
 
