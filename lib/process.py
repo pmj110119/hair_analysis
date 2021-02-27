@@ -3,8 +3,8 @@ import cv2
 from math import *
 from lib.hair import get_width,getWarpTile
 from lib.utils import midUpsample,findNearest
-
-
+from lib.shortestPath import getShortestPath
+from lib.clusterBinary import myAggCluster
 class BasicProcess():
 
     def magnet(self,point,img_binary,size = 16):
@@ -52,7 +52,9 @@ class BasicProcess():
             # 测宽
             [waist, y_offset] = get_width(tile)
             waist_array[i] = waist
-        waist = round(findNearest(waist_array, np.median(waist_array)))
+        waist_median = round(findNearest(waist_array, np.median(waist_array)))
+        waist_mean = round(findNearest(waist_array, np.mean(waist_array)))
+        waist = min(waist_median,waist_mean)
         return waist
 
     def border(self,joints,img_binary):
@@ -67,79 +69,126 @@ class BasicProcess():
         """        
         return joints
 
+    def binary_search(self,img_bgr, img_binary):
+        """[自动调参并筛选后的二值化]
 
+        Args:
+            img_bgr (ndarray):  [原图]      
+            img_binary (ndarray): [语义分割二值图]
+
+        Returns:
+            (ndarray):   [二值图] 
+        """        
+        return img_binary
+
+    def binart_cluster(self,img_bgr):
+        n_clusters = 3
+        return myAggCluster(img_bgr,n_clusters)
+
+    def generate_path(self,img_binary, startpoint, endpoint):
+       # img_binary = (img_binary==0).astype(np.uint8)
+
+        if False:
+            img_test = cv2.cvtColor(img_binary.copy()*255, cv2.COLOR_GRAY2BGR)
+            cv2.circle(img_test,(startpoint[1],startpoint[0]),3,(0,255,0),0)
+            cv2.circle(img_test, (endpoint[1],endpoint[0]), 3, (0, 0, 255),0)
+            cv2.imwrite('zzzz22.png', img_test)
+
+        path_joints, length = getShortestPath(img_binary/255,startpoint,endpoint)
+        joints=[]
+        step = 15
+        for i in np.arange(0, len(path_joints), step):
+            joints.append([path_joints[i][1],path_joints[i][0]])
+        if len(path_joints)%step!=0:
+            joints.append([path_joints[-1][1], path_joints[-1][0]])
+        return joints, length
 
 class MyProcess(BasicProcess):
     # 吸铁石
-    def magnet(self,point, img_binary, size=16):
+    def magnet(self,point, img_binary, size=12):
         """
         point: the loc of the raw point
         img_binary: the binary img
         return point2: the calculated point
         """
-        # 确定直线矩阵
-        point = point[::-1]
-        # print(point)
-        width,length = img_binary.shape
+        point2 = [0, 0]
+        size = 12
+        # point =[1209,912]
+        point = point[::-1]  # 输入的点的xy需要修改倒置才能使用
+        width, length = img_binary.shape
 
-        # print('bi大小:\n',width,length)
-        m1 = point[0] - size
+        # 防止范围超出图片大小
+        m1 = point[0] - size  # 行的左界
         if m1 < 0:
             m1 = 0
-        m2 = point[0] + size + 1
+        m2 = point[0] + size + 1  # 行的右界
         if m2 > width:
             m2 = width
-        m3 = point[1] - size
-        if m3 <0:
-            m3=0
-        m4 = point[1] + size + 1
+        m3 = point[1] - size  # 列的上界
+        if m3 < 0:
+            m3 = 0
+        m4 = point[1] + size + 1  # 列的下界
         if m4 > length:
             m4 = length
-        #以上防止范围超出图片大小
-        # img_binary = img_binary[::-1]
-        line_cloumn = img_binary[m1:m2, point[1]]
-        line_row = img_binary[point[0], m3:m4]
 
-        # 确定垂直线第一个和最后一个数值最高的点的坐标
-        indx = cv2.minMaxLoc(line_cloumn, None)
-        indx2 = np.where(line_cloumn == indx[1])
-        l0 = indx2[0]  # 所有最大值点的坐标
-        l = np.size(indx2, 1)  # 最小值的个数
-        firstmin_loc = indx[3]
-        firstmin_loc = np.array([firstmin_loc[1], 0])
-        lastmin_loc = np.array([l0[l - 1], 0])
-        # 确定中间点的坐标
-        mid = (firstmin_loc + lastmin_loc) / 2
-        mid = np.around(mid)
-        if mid[0] == size:
-            mid = firstmin_loc
-        row = mid[0] - size
-        point2_column = np.array([point[0] + row, point[1]])
-        # print('垂点：\n',point2_column)
+        # 确定矩形
+        region = img_binary[m1:m2, m3:m4]
+        w, w1 = region.shape
 
-        # 确定水平线第一个和最后一个数值最大的点的坐标
-        indx3 = cv2.minMaxLoc(line_row, None)
-        indx4 = np.where(line_row == indx3[1])
-        l01 = indx4[0]  # 所有最大值点的坐标
-        l11 = np.size(indx4, 1)  # 最小值的个数
-        firstmin_loc1 = indx3[3]
-        firstmin_loc1 = np.array([0, firstmin_loc1[1]])
-        lastmin_loc1 = np.array([0, l01[l11 - 1]])
-        # 确定中间点的坐标
-        mid1 = (firstmin_loc1 + lastmin_loc1) / 2
-        mid1 = np.around(mid1)
-        if mid1[1] == size:
-            mid1 = firstmin_loc1
-        row1 = mid1[1] - size
-        point2_column1 = np.array([point[0], point[1] + row1])
+        # 确定那个矩形中存在255点，否则返回原点坐标
+        flag = 0
+        for x in np.nditer(region):
+            if x == 255:
+                flag = 1
+        if flag == 0:
+            print("矩形中不存在最大值点,返回原点\n")
+            point2[0] = point[1]
+            point2[1] = point[0]
 
-        # print('水平点：\n',point2_column1)
-        if abs(row) <= abs(row1):
-            point2 = point2_column
-        else:
-            point2 = point2_column1
+        # 确定矩形中输入点的位置
+        center = np.zeros((1, 2), dtype=int)
+        if w == w1:  # 大多数正常
+            center = [size, size]
+        elif m1 == 0 and w1 == 2 * size + 1:  # 靠左
+            center = [w - size, size]
+        elif m2 == width and w1 == 2 * size + 1:  # 靠右
+            center = [size, size]
+        elif m3 == 0 and w == 2 * size + 1:  # 靠上
+            center = [size, w1 - size]
+        elif m4 == length and w == 2 * size + 1:  # 靠下
+            center = [size, size]
+        elif m1 == 0 and m3 == 0:  # 左上角
+            center = [w - size, w1 - size]
+        elif m2 == width and m3 == 0:  # 右上角
+            center = [size, w1 - size]
+        elif m1 == 0 and m4 == length:  # 左下角
+            center = [w - size, size]
+        elif m2 == width and m4 == length:  # 右下角
+            center = [size, size]
+        if flag == 1:
+            # print("flag=1,region中存在最大值点，输出点为距离最近点\n")
+            # 找到矩形中所有最大值的点坐标,距离最小作为输出点
+            indx = np.where(region == 255)
+            loc1 = indx[0]  # 所有最大值点的行坐标
+            loc2 = indx[1]  # 所有最大值点的列坐标
+            l3 = loc1 - center[0]
+            l4 = loc2 - center[1]
+            l3 = np.power(l3, 2)
+            l4 = np.power(l4, 2)
+            dis = np.sum([l3, l4], axis=0)
+            p1 = np.where(dis == np.min(dis))
+            p2 = p1[0]
+            p3 = p2[0]
+            # print("p3:\n", p3)
+            point2[0] = point[0] + loc1[p3] - size
+            point2[1] = point[1] + loc2[p3] - size
+            point2 = point2[::-1]
 
-        point2 = point2[::-1]
-        # print(point2)
+            # # 保证原始点不是最大值点，否则返回原点
+            # char1 = img_binary[point[1], point[0]]
+            # if char1 == 255:
+            #     print("初始点已是最大值点，返回原点\n")
+            #     point2 = point
+            #     point2 = point2[::-1]
         return point2
 

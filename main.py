@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import *
 import sys
 import cv2 as cv
 import os
+from skimage import morphology
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas    # matplotlib画图用
 import numpy as np
 import json
@@ -43,15 +44,16 @@ JOINT = 1
 RECT = 2
 
 
+BINARY = 0
+SKELETON = 1
 
-ORIGIN = 0
-BINARY = 1
-IMPAINT = 2
+
 
 BINARY_NORMAL = 0
 BINARY_AUTO = 1
 BINARY_DL = 2
-
+BINARY_AUTO_WITH_DL = 3
+BINARY_Cluster = 4
 
 class HandleBlingThread(QThread):  # 步骤1.创建一个线程实例
    # mysignal = pyqtSignal(tuple)  # 创建一个自定义信号，元组参数
@@ -83,6 +85,7 @@ class Mark(QMainWindow):
         self.binary_normal = None
         self.binary_auto = None
         self.binary_dl = None
+        self.binary_aoto_with_dl = None
 
         self.result=[]
         self.result_origin=[]
@@ -98,7 +101,7 @@ class Mark(QMainWindow):
 
         self.plot_alpha = 1.0
         # 模式选择标志
-        self.show_type = ORIGIN
+        self.show_type = BINARY
         self.binary_type = BINARY_DL
         self.downsample_ratio = 1
         # 序号
@@ -180,8 +183,8 @@ class Mark(QMainWindow):
         self.sliderBinaryAuto.valueChanged.connect(self.thresholdBinaryAutoUpdate)
 
 
-        self.radioImageOrigin.toggled.connect(self.originChecked)
-        self.radioImageBinary.toggled.connect(self.binaryChecked)
+        self.radioBinaryFlag.toggled.connect(self.binaryChecked)
+        self.radioSkeletonFlag.toggled.connect(self.skeletonChecked)
 
         self.editDownsample.textChanged.connect(self.downsampleChanged)
 
@@ -189,6 +192,11 @@ class Mark(QMainWindow):
         self.radioBinaryNormal.toggled.connect(self.binaryChecked_Normal)
         self.radioBinaryAuto.toggled.connect(self.binaryChecked_Auto)
         self.radioBinaryDL.toggled.connect(self.binaryChecked_DL)
+        self.radioBinaryAutoWithDL.toggled.connect(self.binaryChecked_AutoWithDL)
+        self.radioBinaryCluster.toggled.connect(self.binaryChecked_Cluster)
+
+
+
 
         self.checkLengthCorrect.stateChanged.connect(self.lengthCorrectChecked)
         self.checkPlotFlag.stateChanged.connect(self.plotChecked)
@@ -262,10 +270,8 @@ class Mark(QMainWindow):
                 point = [int(x0+x*self.roi_window / self.labelImg.width()), int(y0+y*self.roi_window / self.labelImg.width())]
                 if (point[0] > 0 and point[1] > 0):
                     if event.button() == Qt.LeftButton:
-                        print(point)
                         if self.magnet_flag:
                             point = process.magnet(point,self.getBinary())
-                        print(point)
                         if self.handle_bone == False:  # 新骨架
                             bone = [point]
                             self.result_bone.append(bone)
@@ -380,10 +386,10 @@ class Mark(QMainWindow):
 
     def getImage(self,update=False):
         img={
-            ORIGIN: self.image_filter,
+            1: self.image_filter,
             BINARY: self.getBinary(update),
         }
-        return img[self.show_type]
+        return img[1]
 
 
 
@@ -428,7 +434,7 @@ class Mark(QMainWindow):
                 x = round(x - x0)
                 y = round(y - y0)
 
-            temp_img = cv.line(self.label_img.copy(), (x, y), (mousePoint[0], mousePoint[1]), (0, 255, 255), 1, cv.LINE_4)       # 直接用opencv绘制细线
+            temp_img = cv.line(self.label_img.copy(), (x, y), (mousePoint[0], mousePoint[1]), (100, 255, 100), 2, cv.LINE_4)       # 直接用opencv绘制细线
 
             # temp = curve_plot(self.label_img,[self.result[self.handle_index]], 0,(0, 255, 0),(0, 255, 0),alpha=alpha,handle_diff=[self.roiInf_corrected[0],self.roiInf_corrected[2]])   # 仅对选中的一根毛发进行绘制
             # self.label_img = temp['img']
@@ -562,14 +568,14 @@ class Mark(QMainWindow):
         self.editDownsample.clearFocus()
         self.itemClick()
     # 图像显示类型选择
-    def originChecked(self,isChecked):
+    def skeletonChecked(self,isChecked):
         if isChecked:
-            self.show_type = ORIGIN
-        self.imshow()
+            self.show_type = SKELETON
+        self.imshow(update=True)
     def binaryChecked(self,isChecked):
         if isChecked:
             self.show_type = BINARY
-        self.imshow()
+        self.imshow(update=True)
     # 二值图生成方式选择
     def binaryChecked_Normal(self,isChecked):
         if isChecked:
@@ -586,29 +592,98 @@ class Mark(QMainWindow):
             self.binary_type = BINARY_DL
             self.getBinary(True)
         self.imshow()
+    def binaryChecked_AutoWithDL(self,isChecked) :
+        if isChecked:
+            self.binary_type = BINARY_AUTO_WITH_DL
+            self.getBinary(True)
+        self.imshow()
+    def binaryChecked_Cluster(self,isChecked) :
+        if isChecked:
+            self.binary_type = BINARY_Cluster
+            self.getBinary(True)
+        self.imshow()
+
+
+
+    
+
+
+
 
 
 
     def getBinary(self, update=False):
+
         if self.binary_type==BINARY_NORMAL:
             if update:
                 img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
                 _, self.img_binary = cv.threshold(img_gray, self.binary_threshold_normal, 255, cv.THRESH_BINARY_INV)
-            return self.img_binary
+                if self.show_type == SKELETON:
+                    self.skeleton = morphology.skeletonize(self.img_binary / 255).astype(np.uint8) * 255
+
+            if self.show_type==SKELETON:
+                return self.skeleton
+            else:
+                return self.img_binary
+
         elif self.binary_type==BINARY_AUTO:
             if update:
                 img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
                 self.binary_auto = cv.adaptiveThreshold(img_gray, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,int(11/self.downsample_ratio),self.binary_threshold_auto)
-            return self.binary_auto
+                if self.show_type == SKELETON:
+                    self.skeleton = morphology.skeletonize(self.binary_auto / 255).astype(np.uint8) * 255
+
+            if self.show_type==SKELETON:
+                return self.skeleton
+            else:
+                return self.binary_auto
+
         elif self.binary_type==BINARY_DL:
             if update:
                 img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
-                dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY)
+                dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
                 _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
                 self.binary_dl = cv.resize(self.binary_dl,
                                 (int(self.binary_dl.shape[1] / self.downsample_ratio), int(self.binary_dl.shape[0] / self.downsample_ratio)))
-            return self.binary_dl
+                if self.show_type == SKELETON:
+                    self.skeleton = morphology.skeletonize(self.binary_dl / 255).astype(np.uint8) * 255
+
+            if self.show_type==SKELETON:
+                return self.skeleton
+            else:
+                return self.binary_dl
+
+        elif self.binary_type==BINARY_AUTO_WITH_DL:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
+            if update:
+                img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
+                dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) 
+                _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
+                self.binary_aoto_with_dl = process.binary_search(self.image_origin,self.binary_dl)
+                if self.show_type==SKELETON:
+                    self.skeleton = morphology.skeletonize(self.binary_aoto_with_dl / 255).astype(np.uint8) * 255
+
+            if self.show_type==SKELETON:
+                return self.skeleton
+            else:
+                return self.binary_aoto_with_dl
+
+
+        elif self.binary_type==BINARY_Cluster:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
+            if update:
+                img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
+                self.binary_cluster = process.binart_cluster(img_gray)
+                if self.show_type==SKELETON:
+                    self.skeleton = morphology.skeletonize(self.binary_cluster / 255).astype(np.uint8) * 255
+
+            if self.show_type==SKELETON:
+                return self.skeleton
+            else:
+                return self.binary_cluster
+
         return None
+
+
+
 
 
     def distinguishUpdate(self,value):
@@ -745,6 +820,43 @@ class Mark(QMainWindow):
                 self.result_origin.append({'joints': self.listModift(self.result_bone[-1]), 'width': int(height*self.downsample_ratio),
                                     'mid': [mid[0]*self.downsample_ratio, mid[1]*self.downsample_ratio]})
 
+    def generateHairPath(self):
+        if self.handle_bone == True:
+            self.handle_bone = False
+            if len(self.result_bone[-1]) >= 2:
+                joint_temp = self.result_bone[-1]
+
+                joint_temp = process.border(joint_temp,self.getBinary())
+                x0, x1 = min(joint_temp[0][0], joint_temp[-1][0]), max(joint_temp[0][0], joint_temp[-1][0])
+                y0, y1 = min(joint_temp[0][1], joint_temp[-1][1]), max(joint_temp[0][1], joint_temp[-1][1])
+                #[x0,y0],[x1,y1] = joint_temp[0],joint_temp[-1]
+                x0_outer = x0 - 30
+                x1_outer = x1 + 30
+                y0_outer = y0 - 30
+                y1_outer = y1 + 30
+
+
+
+                img_binary = self.getBinary()[y0_outer:y1_outer, x0_outer:x1_outer]  # 得到二值图ROI
+                #img_binary = self.skeleton[y0_outer:y1_outer, x0_outer:x1_outer]  # 得到二值图ROI
+                joints,length = process.generate_path(img_binary,[30,30],[(y1-y0)+30,x1-x0+30])
+                for joint in joints:
+                    joint[0] = joint[0] - 30 + x0
+                    joint[1] = joint[1] - 30 + y0
+                if len(joints)==0:
+                    return
+
+                self.result.pop(-1)
+                self.result_origin.pop(-1)
+
+                height = process.waist(joints,self.getBinary())
+                mid = getMidPoint(joints)
+
+                self.result.append({'joints': joints, 'width': height, 'mid': mid})
+                self.result_origin.append({'joints': self.listModift(joints), 'width': int(height*self.downsample_ratio),
+                                    'mid': [mid[0]*self.downsample_ratio, mid[1]*self.downsample_ratio]})
+
+           
 
 
     # 捕捉键盘事件
@@ -764,13 +876,16 @@ class Mark(QMainWindow):
             self.magnet_flag=True
 
         # 确认
-        if QKeyEvent.key() == Qt.Key_Q:
-            begin = time.time()
+        if QKeyEvent.key() == Qt.Key_E:
             self.checkThisHair()
+            self.imshow()
+            return
+        elif QKeyEvent.key() == Qt.Key_Q:
+            begin = time.time()
+            self.generateHairPath()
             begin1 = time.time()
             self.imshow()
             return
-
 
 
 

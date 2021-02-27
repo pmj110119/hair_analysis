@@ -330,22 +330,26 @@ def getMidPoint(joint):
     return [x,y]
 
 def fitCurve(joint):
-    k=3
-    if len(joint)<=3:
+    try:
+        k=3
+        if len(joint)<=3:
+            return joint
+
+        x = np.zeros(len(joint))
+        y = np.zeros(len(joint))
+        for idx,joint in enumerate(joint):
+            x[idx] = joint[0]
+            y[idx] = joint[1]
+        tcktuples, uarray = sp.interpolate.splprep([x, y],k=k,s=0)
+        unew = np.arange(0, 1.02, 0.02)
+        splinevalues = sp.interpolate.splev(unew, tcktuples)
+        new_joint = []
+        for x,y in zip(splinevalues[0],splinevalues[1]):
+            new_joint.append([x,y])
+        return new_joint
+    except:
         return joint
 
-    x = np.zeros(len(joint))
-    y = np.zeros(len(joint))
-    for idx,joint in enumerate(joint):
-        x[idx] = joint[0]
-        y[idx] = joint[1]
-    tcktuples, uarray = sp.interpolate.splprep([x, y],k=k,s=0)
-    unew = np.arange(0, 1.02, 0.02)
-    splinevalues = sp.interpolate.splev(unew, tcktuples)
-    new_joint = []
-    for x,y in zip(splinevalues[0],splinevalues[1]):
-        new_joint.append([x,y])
-    return new_joint
 
 def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 100, 200),alpha=1,roi=None,handle_diff=None,handle_width=None):
     if roi is not None:
@@ -372,8 +376,8 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
         if handle_width is not None:
             width = handle_width
         mid_point = result['mid']
-        joint_fit = fitCurve(joint)
-
+        joint_fit = fitCurve(joint)    # 暂时关闭曲线拟合功能
+        #joint_fit = joint
         if width>=distinguishValue:
             color=color2
         else:
