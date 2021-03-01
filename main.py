@@ -55,16 +55,17 @@ BINARY_DL = 2
 BINARY_AUTO_WITH_DL = 3
 BINARY_Cluster = 4
 
-class HandleBlingThread(QThread):  # 步骤1.创建一个线程实例
-   # mysignal = pyqtSignal(tuple)  # 创建一个自定义信号，元组参数
-    def __init__(self):
-        super(HandleBlingThread, self).__init__()
-
+class InpaintThread(QThread):  # 步骤1.创建一个线程实例
+    mysignal = pyqtSignal(np.ndarray)  # 创建一个自定义信号，元组参数
+    def __init__(self,result,image):
+        super(InpaintThread, self).__init__()
+        self.result_ = result
+        self.img = image
     def run(self):
-        a = (1, 2)
-        while True:
-            print('HandleBlingThread！！！')
-        # self.mysignal.emit(a)  # 发射自定义信号
+
+        img_impaint = impaint(self.result_, self.img)
+        print('Inpaint over！！！')
+        self.mysignal.emit(img_impaint)  # 发射自定义信号
 
 
 #图像标记类
@@ -206,7 +207,7 @@ class Mark(QMainWindow):
 
 
 
-        self.handleBlingThread = HandleBlingThread()  # 步骤2. 主线程连接子线
+        
         # self.my_thread.mysignal.connect(self.zhi)  # 自定义信号连接
 
 
@@ -336,7 +337,7 @@ class Mark(QMainWindow):
                         self.imshow()
                         pass
 
-                    #self.handleBlingThread.start()  # 步骤3 子线程开始执行run函数
+                    
 
             if event.type()==QEvent.MouseMove:
                 [x, y] = [event.pos().x(), event.pos().y()]
@@ -707,8 +708,24 @@ class Mark(QMainWindow):
 
     def buttonImpaintEvent(self):
         print('拔毛函数')
-        self.img_impaint = impaint(self.result, self.image_origin.copy())
+        self.inpaintThread = InpaintThread(self.result, self.image_origin.copy())  # 步骤2. 主线程连接子线
+        self.inpaintThread.mysignal.connect(self.buttonImpaintEventSignal)
+        self.inpaintThread.start()  # 步骤3 子线程开始执行run函数
+        
+        # self.img_impaint = impaint(self.result, self.image_origin.copy())
+        # self.imshow_small_picture()
+
+    def buttonImpaintEventSignal(self,img_inpaint):
+        self.img_impaint = img_inpaint
         self.imshow_small_picture()
+
+        
+        # cv.imshow('aaa',img_inpaint)
+        # cv.waitKey(0)
+
+
+
+
 
 
 
