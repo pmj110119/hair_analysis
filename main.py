@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import *
 import sys
 import cv2 as cv
 import os
-from skimage import morphology
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas    # matplotlib画图用
 import numpy as np
 import json
@@ -45,7 +44,7 @@ RECT = 2
 
 
 BINARY = 0
-SKELETON = 1
+
 
 
 
@@ -185,7 +184,7 @@ class Mark(QMainWindow):
 
 
         self.radioBinaryFlag.toggled.connect(self.binaryChecked)
-        self.radioSkeletonFlag.toggled.connect(self.skeletonChecked)
+
 
         self.editDownsample.textChanged.connect(self.downsampleChanged)
 
@@ -201,6 +200,10 @@ class Mark(QMainWindow):
 
         self.checkLengthCorrect.stateChanged.connect(self.lengthCorrectChecked)
         self.checkPlotFlag.stateChanged.connect(self.plotChecked)
+        self.checkMagnetFlag.stateChanged.connect(self.magnetChecked)
+
+     
+
 
         self.buttonSave.clicked.connect(self.buttonSaveEvent)
         self.buttonImpaint.clicked.connect(self.buttonImpaintEvent)
@@ -549,6 +552,12 @@ class Mark(QMainWindow):
 
 
 
+    def magnetChecked(self, isChecked):
+        if (isChecked == 0):
+            self.magnet_flag = False
+        else:
+            self.magnet_flag = True
+
     def plotChecked(self, isChecked):
         if (isChecked == 0):
             self.isPlot = False
@@ -568,11 +577,7 @@ class Mark(QMainWindow):
         self.downsample_ratio = float(self.editDownsample.text())
         self.editDownsample.clearFocus()
         self.itemClick()
-    # 图像显示类型选择
-    def skeletonChecked(self,isChecked):
-        if isChecked:
-            self.show_type = SKELETON
-        self.imshow(update=True)
+
     def binaryChecked(self,isChecked):
         if isChecked:
             self.show_type = BINARY
@@ -619,25 +624,13 @@ class Mark(QMainWindow):
             if update:
                 img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
                 _, self.img_binary = cv.threshold(img_gray, self.binary_threshold_normal, 255, cv.THRESH_BINARY_INV)
-                if self.show_type == SKELETON:
-                    self.skeleton = morphology.skeletonize(self.img_binary / 255).astype(np.uint8) * 255
-
-            if self.show_type==SKELETON:
-                return self.skeleton
-            else:
-                return self.img_binary
+            return self.img_binary
 
         elif self.binary_type==BINARY_AUTO:
             if update:
                 img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
                 self.binary_auto = cv.adaptiveThreshold(img_gray, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,int(11/self.downsample_ratio),self.binary_threshold_auto)
-                if self.show_type == SKELETON:
-                    self.skeleton = morphology.skeletonize(self.binary_auto / 255).astype(np.uint8) * 255
-
-            if self.show_type==SKELETON:
-                return self.skeleton
-            else:
-                return self.binary_auto
+            return self.binary_auto
 
         elif self.binary_type==BINARY_DL:
             if update:
@@ -646,13 +639,7 @@ class Mark(QMainWindow):
                 _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
                 self.binary_dl = cv.resize(self.binary_dl,
                                 (int(self.binary_dl.shape[1] / self.downsample_ratio), int(self.binary_dl.shape[0] / self.downsample_ratio)))
-                if self.show_type == SKELETON:
-                    self.skeleton = morphology.skeletonize(self.binary_dl / 255).astype(np.uint8) * 255
-
-            if self.show_type==SKELETON:
-                return self.skeleton
-            else:
-                return self.binary_dl
+            return self.binary_dl
 
         elif self.binary_type==BINARY_AUTO_WITH_DL:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
             if update:
@@ -660,26 +647,14 @@ class Mark(QMainWindow):
                 dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) 
                 _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
                 self.binary_aoto_with_dl = process.binary_search(self.image_origin,self.binary_dl)
-                if self.show_type==SKELETON:
-                    self.skeleton = morphology.skeletonize(self.binary_aoto_with_dl / 255).astype(np.uint8) * 255
-
-            if self.show_type==SKELETON:
-                return self.skeleton
-            else:
-                return self.binary_aoto_with_dl
+            return self.binary_aoto_with_dl
 
 
-        elif self.binary_type==BINARY_Cluster:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
-            if update:
-                img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
-                self.binary_cluster = process.binart_cluster(img_gray)
-                if self.show_type==SKELETON:
-                    self.skeleton = morphology.skeletonize(self.binary_cluster / 255).astype(np.uint8) * 255
-
-            if self.show_type==SKELETON:
-                return self.skeleton
-            else:
-                return self.binary_cluster
+        # elif self.binary_type==BINARY_Cluster:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
+        #     if update:
+        #         img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
+        #         self.binary_cluster = process.binart_cluster(img_gray)
+        #     return self.binary_cluster
 
         return None
 
@@ -708,6 +683,7 @@ class Mark(QMainWindow):
 
     def buttonImpaintEvent(self):
         print('拔毛函数')
+        self.lineEditInpaint.setText('拔毛中...')
         self.inpaintThread = InpaintThread(self.result, self.image_origin.copy())  # 步骤2. 主线程连接子线
         self.inpaintThread.mysignal.connect(self.buttonImpaintEventSignal)
         self.inpaintThread.start()  # 步骤3 子线程开始执行run函数
@@ -718,7 +694,7 @@ class Mark(QMainWindow):
     def buttonImpaintEventSignal(self,img_inpaint):
         self.img_impaint = img_inpaint
         self.imshow_small_picture()
-
+        self.lineEditInpaint.setText('拔毛完成')
         
         # cv.imshow('aaa',img_inpaint)
         # cv.waitKey(0)
@@ -844,24 +820,26 @@ class Mark(QMainWindow):
                 joint_temp = self.result_bone[-1]
 
                 joint_temp = process.border(joint_temp,self.getBinary())
-                x0, x1 = min(joint_temp[0][0], joint_temp[-1][0]), max(joint_temp[0][0], joint_temp[-1][0])
-                y0, y1 = min(joint_temp[0][1], joint_temp[-1][1]), max(joint_temp[0][1], joint_temp[-1][1])
-                #[x0,y0],[x1,y1] = joint_temp[0],joint_temp[-1]
-                x0_outer = x0 - 30
-                x1_outer = x1 + 30
-                y0_outer = y0 - 30
-                y1_outer = y1 + 30
+ 
+                [x0,y0],[x1,y1] = joint_temp[0],joint_temp[-1]
+                x_min = min(joint_temp[0][0], joint_temp[-1][0]) - 30
+                x_max = max(joint_temp[0][0], joint_temp[-1][0]) + 30
+                y_min = min(joint_temp[0][1], joint_temp[-1][1]) - 30
+                y_max = max(joint_temp[0][1], joint_temp[-1][1]) + 30
 
 
 
-                img_binary = self.getBinary()[y0_outer:y1_outer, x0_outer:x1_outer]  # 得到二值图ROI
-                #img_binary = self.skeleton[y0_outer:y1_outer, x0_outer:x1_outer]  # 得到二值图ROI
-                joints,length = process.generate_path(img_binary,[30,30],[(y1-y0)+30,x1-x0+30])
-                for joint in joints:
-                    joint[0] = joint[0] - 30 + x0
-                    joint[1] = joint[1] - 30 + y0
-                if len(joints)==0:
+
+
+                img_binary = self.getBinary()[y_min:y_max, x_min:x_max]  # 得到二值图ROI
+
+                joints,length = process.generate_path(img_binary,[y0-y_min,x0-x_min],[y1-y_min,x1-x_min])
+                if len(joints)<2:
                     return
+
+                for joint in joints:    # 映射回原图坐标系
+                    joint[0] = joint[0] + x_min
+                    joint[1] = joint[1] + y_min
 
                 self.result.pop(-1)
                 self.result_origin.pop(-1)
@@ -877,9 +855,7 @@ class Mark(QMainWindow):
 
 
     # 捕捉键盘事件
-    def keyReleaseEvent(self, QKeyEvent):
-        if QKeyEvent.key() == Qt.Key_E:
-            self.magnet_flag=True
+
 
     def keyPressEvent(self, QKeyEvent):
         if self.img_loaded==False:
@@ -887,10 +863,7 @@ class Mark(QMainWindow):
 
 
  
-        if QKeyEvent.key() == Qt.Key_E:
-            self.magnet_flag=False
-        else:
-            self.magnet_flag=True
+
 
         # 确认
         if QKeyEvent.key() == Qt.Key_E:
@@ -1053,9 +1026,14 @@ class Mark(QMainWindow):
             for data in datas:
                 if len(data['joints'])<2:
                     continue
+                if data['width']==0 or data['mid'] is nan:
+                    continue
+
+
                 d={}
                 d_origin={}
                 joints = data['joints']
+
                 joints_origin = []
                 for joint in joints:
                     joints_origin.append(joint.copy())

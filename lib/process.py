@@ -4,7 +4,7 @@ from math import *
 from lib.hair import get_width,getWarpTile
 from lib.utils import midUpsample,findNearest
 from lib.shortestPath import getShortestPath
-from lib.clusterBinary import myAggCluster
+#from lib.clusterBinary import myAggCluster
 class BasicProcess():
 
     def magnet(self,point,img_binary,size = 16):
@@ -81,9 +81,9 @@ class BasicProcess():
         """        
         return img_binary
 
-    def binart_cluster(self,img_bgr):
-        n_clusters = 3
-        return myAggCluster(img_bgr,n_clusters)
+    # def binart_cluster(self,img_bgr):
+    #     n_clusters = 3
+    #     return myAggCluster(img_bgr,n_clusters)
 
     def generate_path(self,img_binary, startpoint, endpoint):
        # img_binary = (img_binary==0).astype(np.uint8)

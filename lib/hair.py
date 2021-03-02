@@ -372,6 +372,8 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
    # draw_curve = ImageDraw.Draw(curve)  # 实例化一个对象
     for result in results:
         joint = result['joints']
+        if len(joint)<2:
+            continue
         width = result['width']
         if handle_width is not None:
             width = handle_width
