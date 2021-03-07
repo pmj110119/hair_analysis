@@ -1152,6 +1152,9 @@ E键：仅测宽</string>
       <height>31</height>
      </rect>
     </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
     <property name="text">
      <string>待机...</string>
     </property>

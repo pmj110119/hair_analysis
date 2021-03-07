@@ -386,10 +386,13 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
             color=color1
         # 画线
         for i in range(len(joint_fit) - 1):
-            p1 = (int(joint_fit[i][0])-x0, int(joint_fit[i][1])-y0)
-            p2 = (int(joint_fit[i + 1][0])-x0, int(joint_fit[i + 1][1])-y0)
-            draw_img.line(p1 + p2 , fill=color, width=width)
-
+            #print(joint_fit[i])
+            try:        # IndexError: invalid index to scalar variable.
+                p1 = (int(joint_fit[i][0])-x0, int(joint_fit[i][1])-y0)
+                p2 = (int(joint_fit[i + 1][0])-x0, int(joint_fit[i + 1][1])-y0)
+                draw_img.line(p1 + p2 , fill=color, width=width)
+            except:
+                continue
         radius = width / 2
         if radius<3:
             radius=3

@@ -55,6 +55,7 @@ class BasicProcess():
         waist_median = round(findNearest(waist_array, np.median(waist_array)))
         waist_mean = round(findNearest(waist_array, np.mean(waist_array)))
         waist = min(waist_median,waist_mean)
+        #waist = np.min(waist_array)
         return waist
 
     def border(self,joints,img_binary):

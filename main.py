@@ -15,6 +15,7 @@ from pyqtgraph import PlotWidget
 import pyqtgraph as pg
 import glob
 import time
+
 from math import  *
 from screeninfo import get_monitors
 from lib.utils import *
@@ -276,6 +277,8 @@ class Mark(QMainWindow):
                     if event.button() == Qt.LeftButton:
                         if self.magnet_flag:
                             point = process.magnet(point,self.getBinary())
+                            point[0] = np.clip(point[0],0,self.image_origin.shape[1])
+                            point[1] = np.clip(point[1],0,self.image_origin.shape[0])
                         if self.handle_bone == False:  # 新骨架
                             bone = [point]
                             self.result_bone.append(bone)
@@ -514,14 +517,6 @@ class Mark(QMainWindow):
             self.width_count[int(width)] += 1
 
 
-        ## matplotlib绘制更好看的柱状图。。。。
-        # plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
-        # num_list = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
-        # plt.bar(num_list, self.width_count[:20], color="lightseagreen", tick_label=num_list)
-        # for a, b in zip(num_list, self.width_count[:20]):
-        #     plt.text(a, b + 0.1, b, ha='center', va='bottom')  # 每个柱顶部显示数值
-        # plt.xlabel('宽度')
-        # plt.ylabel('数量')
 
 
         inf = analysisInf(self.width_count[:self.distinguishValue])
@@ -822,10 +817,10 @@ class Mark(QMainWindow):
                 joint_temp = process.border(joint_temp,self.getBinary())
  
                 [x0,y0],[x1,y1] = joint_temp[0],joint_temp[-1]
-                x_min = min(joint_temp[0][0], joint_temp[-1][0]) - 30
-                x_max = max(joint_temp[0][0], joint_temp[-1][0]) + 30
-                y_min = min(joint_temp[0][1], joint_temp[-1][1]) - 30
-                y_max = max(joint_temp[0][1], joint_temp[-1][1]) + 30
+                x_min = max(min(joint_temp[0][0], joint_temp[-1][0]) - 30, 0)
+                x_max = min(max(joint_temp[0][0], joint_temp[-1][0]) + 30,self.image_origin.shape[1])
+                y_min = max(min(joint_temp[0][1], joint_temp[-1][1]) - 30,0)
+                y_max = min(max(joint_temp[0][1], joint_temp[-1][1]) + 30,self.image_origin.shape[0])
 
 
 
@@ -979,6 +974,20 @@ class Mark(QMainWindow):
                  'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
             self.handle_index = -1  
             self.imshow()
+
+        elif QKeyEvent.key() == Qt.Key_P:  # 变窄
+            # matplotlib绘制更好看的柱状图。。。。
+            plt.figure()
+            plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+            num_list = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+            plt.bar(num_list, self.width_count[:20], color="lightseagreen", tick_label=num_list)
+            for a, b in zip(num_list, self.width_count[:20]):
+                plt.text(a, b + 0.1, b, ha='center', va='bottom')  # 每个柱顶部显示数值
+            plt.xlabel('宽度')
+            plt.ylabel('数量')
+            plt.show()
+
+
         if len(joints)==2:
             pass
             # if QKeyEvent.key()== Qt.Key_Left:   # 逆时针旋转
@@ -1026,8 +1035,13 @@ class Mark(QMainWindow):
             for data in datas:
                 if len(data['joints'])<2:
                     continue
-                if data['width']==0 or data['mid'] is nan:
+                if data['width']==0 or isnan(data['mid'][0]):
                     continue
+
+                # print(data['mid'][0])
+                # print())
+                # a = data['mid'][0]
+                # b = nan in data['mid']
 
 
                 d={}
