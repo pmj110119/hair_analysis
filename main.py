@@ -103,7 +103,7 @@ class Mark(QMainWindow):
         self.plot_alpha = 1.0
         # 模式选择标志
         self.show_type = BINARY
-        self.binary_type = BINARY_DL
+        self.binary_type = BINARY_AUTO
         self.downsample_ratio = 1
         # 序号
         self.handle_index=-1
@@ -121,6 +121,10 @@ class Mark(QMainWindow):
 
     # 根据屏幕分辨率设置界面大小
     def setFixedUI(self):
+
+
+
+
         def findChildrenWidget(widget, allWidgetList):
             if len(widget.children()) > 0:
                 for cwidget in widget.children():
@@ -134,6 +138,12 @@ class Mark(QMainWindow):
         x0 = int(scalep * 2386)
         y0 = int(scalep * 1710)
         self.resize(x0, y0)
+
+        font = QtGui.QFont()
+        font.setFamily("Arial")  # 括号里可以设置成自己想要的其它字体
+        font.setPointSize(round(scalep*20))  # 括号里的数字可以设置成自己想要的字体大小
+
+
         # 缩放UI元素
         widgetList = []
         allWidgetList = []
@@ -148,7 +158,13 @@ class Mark(QMainWindow):
             w = int(widget.geometry().width() * scalep)
             h = int(widget.geometry().height() * scalep)
             widget.setGeometry(QRect(x, y, w, h))
+            try:
+                widget.setFont(font)
+            except:
+                pass
         self.setFixedSize(self.width(), self.height())
+
+
 
         # pyqtgraph柱状图
         self.plot_widget = PlotWidget(self)
@@ -168,7 +184,7 @@ class Mark(QMainWindow):
         # 值的初始化
         self.binary_threshold_normal = self.sliderBinaryNormal.value()
         self.binary_threshold_auto = self.sliderBinaryAuto.value()
-
+        self.binary_close = self.sliderBinaryClose.value()
         # 加载所有图片名并添加到列表中
         allImgs = glob.glob(imgPath+'*.jpg')
 
@@ -183,6 +199,10 @@ class Mark(QMainWindow):
         self.sliderBinaryNormal.valueChanged.connect(self.thresholdBinaryNormalUpdate)
         self.sliderBinaryAuto.valueChanged.connect(self.thresholdBinaryAutoUpdate)
 
+        self.sliderBinaryClose.valueChanged.connect(self.binaryCloseUpdate)
+
+
+
 
         self.radioBinaryFlag.toggled.connect(self.binaryChecked)
 
@@ -193,8 +213,8 @@ class Mark(QMainWindow):
         self.radioBinaryNormal.toggled.connect(self.binaryChecked_Normal)
         self.radioBinaryAuto.toggled.connect(self.binaryChecked_Auto)
         self.radioBinaryDL.toggled.connect(self.binaryChecked_DL)
-        self.radioBinaryAutoWithDL.toggled.connect(self.binaryChecked_AutoWithDL)
-        self.radioBinaryCluster.toggled.connect(self.binaryChecked_Cluster)
+        # self.radioBinaryAutoWithDL.toggled.connect(self.binaryChecked_AutoWithDL)
+        # self.radioBinaryCluster.toggled.connect(self.binaryChecked_Cluster)
 
 
 
@@ -593,16 +613,16 @@ class Mark(QMainWindow):
             self.binary_type = BINARY_DL
             self.getBinary(True)
         self.imshow()
-    def binaryChecked_AutoWithDL(self,isChecked) :
-        if isChecked:
-            self.binary_type = BINARY_AUTO_WITH_DL
-            self.getBinary(True)
-        self.imshow()
-    def binaryChecked_Cluster(self,isChecked) :
-        if isChecked:
-            self.binary_type = BINARY_Cluster
-            self.getBinary(True)
-        self.imshow()
+    # def binaryChecked_AutoWithDL(self,isChecked) :
+    #     if isChecked:
+    #         self.binary_type = BINARY_AUTO_WITH_DL
+    #         self.getBinary(True)
+    #     self.imshow()
+    # def binaryChecked_Cluster(self,isChecked) :
+    #     if isChecked:
+    #         self.binary_type = BINARY_Cluster
+    #         self.getBinary(True)
+    #     self.imshow()
 
 
 
@@ -615,16 +635,25 @@ class Mark(QMainWindow):
 
     def getBinary(self, update=False):
 
+        def closeopration(binary,ksize=3):
+            if ksize==0:
+                return binary
+            kernel = cv.getStructuringElement(cv.MORPH_RECT, (ksize, ksize))
+            binary = cv.morphologyEx(binary, cv.MORPH_CLOSE, kernel)
+            return binary
+
         if self.binary_type==BINARY_NORMAL:
             if update:
                 img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
                 _, self.img_binary = cv.threshold(img_gray, self.binary_threshold_normal, 255, cv.THRESH_BINARY_INV)
+                self.img_binary = closeopration(self.img_binary,ksize=self.binary_close)
             return self.img_binary
 
         elif self.binary_type==BINARY_AUTO:
             if update:
                 img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
                 self.binary_auto = cv.adaptiveThreshold(img_gray, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,int(11/self.downsample_ratio),self.binary_threshold_auto)
+                self.binary_auto = closeopration(self.binary_auto,ksize=self.binary_close)
             return self.binary_auto
 
         elif self.binary_type==BINARY_DL:
@@ -634,15 +663,20 @@ class Mark(QMainWindow):
                 _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
                 self.binary_dl = cv.resize(self.binary_dl,
                                 (int(self.binary_dl.shape[1] / self.downsample_ratio), int(self.binary_dl.shape[0] / self.downsample_ratio)))
+                self.binary_dl = closeopration(self.binary_dl,ksize=self.binary_close)
             return self.binary_dl
 
-        elif self.binary_type==BINARY_AUTO_WITH_DL:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
-            if update:
-                img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
-                dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) 
-                _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
-                self.binary_aoto_with_dl = process.binary_search(self.image_origin,self.binary_dl)
-            return self.binary_aoto_with_dl
+        # elif self.binary_type==BINARY_AUTO_WITH_DL:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
+        #     if update:
+        #         img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
+        #         dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY)
+        #         _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
+        #         self.binary_aoto_with_dl = process.binary_search(self.image_origin,self.binary_dl)
+        #     return self.binary_aoto_with_dl
+
+
+
+
 
 
         # elif self.binary_type==BINARY_Cluster:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
@@ -675,6 +709,10 @@ class Mark(QMainWindow):
 
         self.imshow(update=True)
 
+    def binaryCloseUpdate(self,value):
+        self.binary_close = int(value)
+        self.editClose.setText(str(value))
+        self.imshow(update=True)
 
     def buttonImpaintEvent(self):
         print('拔毛函数')
@@ -815,26 +853,35 @@ class Mark(QMainWindow):
                 joint_temp = self.result_bone[-1]
 
                 joint_temp = process.border(joint_temp,self.getBinary())
- 
-                [x0,y0],[x1,y1] = joint_temp[0],joint_temp[-1]
-                x_min = max(min(joint_temp[0][0], joint_temp[-1][0]) - 30, 0)
-                x_max = min(max(joint_temp[0][0], joint_temp[-1][0]) + 30,self.image_origin.shape[1])
-                y_min = max(min(joint_temp[0][1], joint_temp[-1][1]) - 30,0)
-                y_max = min(max(joint_temp[0][1], joint_temp[-1][1]) + 30,self.image_origin.shape[0])
+                def get_roi(joint1,joint2):
+                    [x0, y0], [x1, y1] = joint1, joint2
+                    x_min = max(min(joint1[0], joint2[0]) - 30, 0)
+                    x_max = min(max(joint1[0], joint2[0]) + 30, self.image_origin.shape[1])
+                    y_min = max(min(joint1[1], joint2[1]) - 30, 0)
+                    y_max = min(max(joint1[1], joint2[1]) + 30, self.image_origin.shape[0])
+                    return x0,y0,x1,y1,x_min,x_max,y_min,y_max
+                # [x0,y0],[x1,y1] = joint_temp[0],joint_temp[-1]
+                # x_min = max(min(joint_temp[0][0], joint_temp[-1][0]) - 30, 0)
+                # x_max = min(max(joint_temp[0][0], joint_temp[-1][0]) + 30,self.image_origin.shape[1])
+                # y_min = max(min(joint_temp[0][1], joint_temp[-1][1]) - 30,0)
+                # y_max = min(max(joint_temp[0][1], joint_temp[-1][1]) + 30,self.image_origin.shape[0])
 
+                joints=[]
+                for j in range(len(joint_temp)-1):
+                    x0, y0, x1, y1, x_min, x_max, y_min, y_max = get_roi(joint_temp[j], joint_temp[j+1])
+                    img_binary = self.getBinary()[y_min:y_max, x_min:x_max]  # 得到二值图ROI
+                    joint,length = process.generate_path(img_binary,[y0-y_min,x0-x_min],[y1-y_min,x1-x_min])
+                    if len(joint) < 2:
+                        continue
+                    for joint_ in joint:  # 映射回原图坐标系
+                        joint_[0] = joint_[0] + x_min
+                        joint_[1] = joint_[1] + y_min
+                    joints = joints[:-1]+joint
 
-
-
-
-                img_binary = self.getBinary()[y_min:y_max, x_min:x_max]  # 得到二值图ROI
-
-                joints,length = process.generate_path(img_binary,[y0-y_min,x0-x_min],[y1-y_min,x1-x_min])
-                if len(joints)<2:
+                if len(joints) < 2:
                     return
 
-                for joint in joints:    # 映射回原图坐标系
-                    joint[0] = joint[0] + x_min
-                    joint[1] = joint[1] + y_min
+
 
                 self.result.pop(-1)
                 self.result_origin.pop(-1)
@@ -889,6 +936,8 @@ class Mark(QMainWindow):
                 self.handle_index = -1
             self.imshow()
 
+        if (len(self.result) < 1):
+            return
 
         joints = self.result[self.handle_index]['joints']
         width = self.result[self.handle_index]['width']

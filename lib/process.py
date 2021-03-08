@@ -4,6 +4,8 @@ from math import *
 from lib.hair import get_width,getWarpTile
 from lib.utils import midUpsample,findNearest
 from lib.shortestPath import getShortestPath
+from scipy import stats
+
 #from lib.clusterBinary import myAggCluster
 class BasicProcess():
 
@@ -52,10 +54,16 @@ class BasicProcess():
             # 测宽
             [waist, y_offset] = get_width(tile)
             waist_array[i] = waist
-        waist_median = round(findNearest(waist_array, np.median(waist_array)))
-        waist_mean = round(findNearest(waist_array, np.mean(waist_array)))
-        waist = min(waist_median,waist_mean)
-        #waist = np.min(waist_array)
+
+        waist = np.min(waist_array)
+        waist_min_count = np.sum(waist_array==waist)
+        if waist_min_count<2:
+            waist_median = floor(findNearest(waist_array, np.median(waist_array)))
+            waist_mean = floor(findNearest(waist_array, np.mean(waist_array)))
+            #waist_mode =  stats.mode(waist_array)[0][0]
+            waist = min(waist_median,waist_mean)
+
+
         return waist
 
     def border(self,joints,img_binary):
@@ -86,7 +94,7 @@ class BasicProcess():
     #     n_clusters = 3
     #     return myAggCluster(img_bgr,n_clusters)
 
-    def generate_path(self,img_binary, startpoint, endpoint):
+    def generate_path(self,img_binary, startpoint, endpoint, step=15):
        # img_binary = (img_binary==0).astype(np.uint8)
 
         if False:
@@ -97,10 +105,10 @@ class BasicProcess():
 
         path_joints, length = getShortestPath(img_binary/255,startpoint,endpoint)
         joints=[]
-        step = 15
+
         for i in np.arange(0, len(path_joints), step):
             joints.append([path_joints[i][1],path_joints[i][0]])
-        if len(path_joints)%step!=0:
+        if (len(path_joints)-1)%step!=0:
             joints.append([path_joints[-1][1], path_joints[-1][0]])
         return joints, length
 

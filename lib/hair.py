@@ -125,6 +125,10 @@ def get_width(tile_binary,threshold=150):
         return [0,0] 
     else:
         x, y, w, h = cv2.boundingRect(cnt)         #用一个矩形将轮廓包围
+        y_up = y
+        y_down = y + h
+        y_mid = tile_binary.shape[0]/2.0
+        h2 = min(y_mid-y_up,y_down-y_mid)*2  # 中点距边缘最短距离*2
         return [h,(y+h/2)-tile_binary.shape[0]/2.0]
 
 
@@ -390,7 +394,7 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
             try:        # IndexError: invalid index to scalar variable.
                 p1 = (int(joint_fit[i][0])-x0, int(joint_fit[i][1])-y0)
                 p2 = (int(joint_fit[i + 1][0])-x0, int(joint_fit[i + 1][1])-y0)
-                draw_img.line(p1 + p2 , fill=color, width=width)
+                draw_img.line(p1 + p2 , fill=color, width=int(width))
             except:
                 continue
         radius = width / 2
