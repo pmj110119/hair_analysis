@@ -75,6 +75,50 @@ def midUpsample(joints):
         new_joints.append([x2, y2])
         new_joints.append([x2 + (x3 - x2) / 2, y2 + (y3 - y2) / 2])
         new_joints.append([x3, y3])
+    elif nums == 5 :
+        x0 = joints[0][0]
+        y0 = joints[0][1]
+        x1 = joints[1][0]
+        y1 = joints[1][1]
+        x2 = joints[2][0]
+        y2 = joints[2][1]
+        x3 = joints[3][0]
+        y3 = joints[3][1]
+        x4 = joints[4][0]
+        y4 = joints[4][1]
+        new_joints.append([x0, y0])
+        new_joints.append([x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2])
+        new_joints.append([x1, y1])
+        new_joints.append([x1 + (x2 - x1) / 2, y1 + (y2 - y1) / 2])
+        new_joints.append([x2, y2])
+        new_joints.append([x2 + (x3 - x2) / 2, y2 + (y3 - y2) / 2])
+        new_joints.append([x3, y3])
+        new_joints.append([x3 + (x4 - x3) / 2, y3 + (y4 - y3) / 2])
+        new_joints.append([x4, y4])
+    elif nums == 6 :
+        x0 = joints[0][0]
+        y0 = joints[0][1]
+        x1 = joints[1][0]
+        y1 = joints[1][1]
+        x2 = joints[2][0]
+        y2 = joints[2][1]
+        x3 = joints[3][0]
+        y3 = joints[3][1]
+        x4 = joints[4][0]
+        y4 = joints[4][1]
+        x5 = joints[5][0]
+        y5 = joints[5][1]
+        new_joints.append([x0, y0])
+        new_joints.append([x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2])
+        new_joints.append([x1, y1])
+        new_joints.append([x1 + (x2 - x1) / 2, y1 + (y2 - y1) / 2])
+        new_joints.append([x2, y2])
+        new_joints.append([x2 + (x3 - x2) / 2, y2 + (y3 - y2) / 2])
+        new_joints.append([x3, y3])
+        new_joints.append([x3 + (x4 - x3) / 2, y3 + (y4 - y3) / 2])
+        new_joints.append([x4, y4])
+        new_joints.append([x4 + (x5 - x4) / 2, y4 + (y5 - y4) / 2])
+        new_joints.append([x5, y5])
     else:
         new_joints = joints
     return new_joints

@@ -277,11 +277,11 @@ class Mark(QMainWindow):
             if event.type() == QEvent.Wheel:
                 whell_angle = event.angleDelta()
                 if whell_angle.y() > 0:
-                    self.plot_alpha+=0.2
-                    if self.plot_alpha>1:
-                        self.plot_alpha=1
+                    self.plot_alpha+=0.15
+                    if self.plot_alpha>=0.6:
+                        self.plot_alpha=0.6
                 else:
-                    self.plot_alpha -= 0.2
+                    self.plot_alpha -= 0.15
                     if self.plot_alpha < 0:
                         self.plot_alpha = 0
                 self.imshow()

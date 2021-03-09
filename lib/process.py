@@ -64,7 +64,7 @@ class BasicProcess():
             waist = min(waist_median,waist_mean)
 
 
-        return waist
+        return int(waist)
 
     def border(self,joints,img_binary):
         """[修正骨架点]

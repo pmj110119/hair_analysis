@@ -83,7 +83,7 @@
         <enum>Qt::NoFocus</enum>
        </property>
        <property name="text">
-        <string>骨架图</string>
+        <string>骨架化二值图</string>
        </property>
       </widget>
      </item>
@@ -353,7 +353,7 @@
       <number>1</number>
      </property>
      <property name="value">
-      <number>6</number>
+      <number>10</number>
      </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
@@ -535,8 +535,11 @@
      <property name="focusPolicy">
       <enum>Qt::NoFocus</enum>
      </property>
+     <property name="maximum">
+      <number>30</number>
+     </property>
      <property name="value">
-      <number>6</number>
+      <number>10</number>
      </property>
     </widget>
     <widget class="QWidget" name="horizontalLayoutWidget">
@@ -595,7 +598,7 @@
    </widget>
    <widget class="QPushButton" name="buttonSave">
     <property name="enabled">
-     <bool>true</bool>
+     <bool>false</bool>
     </property>
     <property name="geometry">
      <rect>
@@ -606,7 +609,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>中间图像导出</string>
+     <string>结果导出</string>
     </property>
    </widget>
    <widget class="QCheckBox" name="checkMergeFlag">
@@ -832,7 +835,7 @@
       <x>860</x>
       <y>30</y>
       <width>541</width>
-      <height>141</height>
+      <height>161</height>
      </rect>
     </property>
     <property name="title">
@@ -842,7 +845,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>6</y>
+       <y>20</y>
        <width>131</width>
        <height>61</height>
       </rect>
@@ -866,7 +869,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>46</y>
+       <y>60</y>
        <width>181</width>
        <height>61</height>
       </rect>
@@ -893,7 +896,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>80</y>
+       <y>100</y>
        <width>171</width>
        <height>61</height>
       </rect>
@@ -917,7 +920,7 @@
      <property name="geometry">
       <rect>
        <x>210</x>
-       <y>26</y>
+       <y>40</y>
        <width>201</width>
        <height>22</height>
       </rect>
@@ -942,7 +945,7 @@
      <property name="geometry">
       <rect>
        <x>210</x>
-       <y>66</y>
+       <y>80</y>
        <width>201</width>
        <height>22</height>
       </rect>
@@ -967,7 +970,7 @@
      <property name="geometry">
       <rect>
        <x>420</x>
-       <y>20</y>
+       <y>34</y>
        <width>101</width>
        <height>31</height>
       </rect>
@@ -991,7 +994,7 @@
      <property name="geometry">
       <rect>
        <x>420</x>
-       <y>60</y>
+       <y>74</y>
        <width>101</width>
        <height>31</height>
       </rect>
@@ -1052,7 +1055,7 @@
     <property name="geometry">
      <rect>
       <x>410</x>
-      <y>210</y>
+      <y>230</y>
       <width>901</width>
       <height>161</height>
      </rect>
@@ -1064,8 +1067,8 @@
     </property>
     <property name="text">
      <string>单根标注确认键
-Q键：自动提取头尾两点之间骨架，并测宽（请确保中间无断裂）
-E键：仅测宽</string>
+Q键：自动提取骨架，并测宽
+E键：直接测宽</string>
     </property>
    </widget>
    <widget class="QCheckBox" name="checkMagnetFlag">
@@ -1112,9 +1115,9 @@ E键：仅测宽</string>
     <property name="geometry">
      <rect>
       <x>860</x>
-      <y>180</y>
+      <y>200</y>
       <width>541</width>
-      <height>91</height>
+      <height>101</height>
      </rect>
     </property>
     <property name="title">
@@ -1124,7 +1127,7 @@ E键：仅测宽</string>
      <property name="geometry">
       <rect>
        <x>60</x>
-       <y>10</y>
+       <y>15</y>
        <width>211</width>
        <height>81</height>
       </rect>
@@ -1145,7 +1148,7 @@ E键：仅测宽</string>
      <property name="geometry">
       <rect>
        <x>210</x>
-       <y>40</y>
+       <y>45</y>
        <width>201</width>
        <height>22</height>
       </rect>
@@ -1170,7 +1173,7 @@ E键：仅测宽</string>
      <property name="geometry">
       <rect>
        <x>420</x>
-       <y>35</y>
+       <y>40</y>
        <width>101</width>
        <height>31</height>
       </rect>
