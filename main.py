@@ -15,6 +15,8 @@ from pyqtgraph import PlotWidget
 import pyqtgraph as pg
 import glob
 import time
+import pandas as pd
+import csv
 
 from math import  *
 from screeninfo import get_monitors
@@ -235,13 +237,6 @@ class Mark(QMainWindow):
         # self.my_thread.mysignal.connect(self.zhi)  # 自定义信号连接
 
 
-    def buttonSaveEvent(self):
-        curve = np.zeros_like(self.image_origin)
-        temp = curve_plot(curve, self.result,distinguishValue=0,color1=(255,255,255),color2=(255,255,255))
-        img = temp['img']
-       # curve = temp['curve']
-        cv.imwrite(self.tmp+'_mask.png',img)
-      #  cv.imwrite(self.tmp + '_mask.png', curve)
 
     def plotBox(self,center,rect_height,rect_width,rect_angle):
         [xp_Click, yp_Click] = center
@@ -627,11 +622,32 @@ class Mark(QMainWindow):
 
 
     
+    def buttonSaveEvent(self):
+        f = open('result.csv', 'w', encoding='utf-8',newline ="")
+
+        csv_writer = csv.writer(f)
+
+        # 3. 构建列表头
+        csv_writer.writerow(["index",'sum']+np.linspace(1,24,24).tolist())
 
 
 
 
 
+        json_files = glob.glob(imgPath + '*.json')
+        for json_file in json_files:
+            result, result_origin = self.loadJson(json_file)
+            width_count = np.zeros(25)
+            sum = 0
+            for result_ in result:
+                width = result_['width']
+                if(width>24):
+                    continue
+                width_count[int(width)] += 1
+                sum += 1
+
+            csv_writer.writerow([os.path.basename(json_file).split('.')[0], sum] + width_count[1:].tolist())
+        f.close()
 
     def getBinary(self, update=False):
 
