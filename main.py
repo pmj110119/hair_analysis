@@ -76,6 +76,8 @@ class Mark(QMainWindow):
         super(Mark, self).__init__()
         uic.loadUi("test.ui",self)
 
+
+        self.setMenu()
         self.setFixedUI()
 
         self.roiInf_corrected = None
@@ -103,6 +105,7 @@ class Mark(QMainWindow):
         self.magnet_flag = True
 
         self.plot_alpha = 1.0
+
         # 模式选择标志
         self.show_type = BINARY
         self.binary_type = BINARY_AUTO
@@ -123,63 +126,77 @@ class Mark(QMainWindow):
 
     # 根据屏幕分辨率设置界面大小
     def setFixedUI(self):
-
-
-
-
-        def findChildrenWidget(widget, allWidgetList):
-            if len(widget.children()) > 0:
-                for cwidget in widget.children():
-                    allWidgetList.append(cwidget)
-                    findChildrenWidget(cwidget, allWidgetList)
-            return allWidgetList
-
         m = get_monitors()[0]
         h = int(m.height)
-        scalep = h / 2160
-        x0 = int(scalep * 2386)
-        y0 = int(scalep * 1710)
-        self.resize(x0, y0)
+        self.scalepFix = h / 1080
+        self.scalep = 0.85 * self.scalepFix
 
-        font = QtGui.QFont()
-        font.setFamily("Arial")  # 括号里可以设置成自己想要的其它字体
-        font.setPointSize(round(scalep*20))  # 括号里的数字可以设置成自己想要的字体大小
+        self.fontSize = 12
 
-
-        # 缩放UI元素
-        widgetList = []
-        allWidgetList = []
-        allWidgetList = findChildrenWidget(self.centralwidget, allWidgetList)
-        for widget in allWidgetList:
-            if isinstance(widget, QPropertyAnimation) or "qt_" in widget.objectName() or widget.objectName() == '':
-                continue
-            widgetList.append(widget)
-        for widget in widgetList:
-            x = int(widget.geometry().x() * scalep)
-            y = int(widget.geometry().y() * scalep)
-            w = int(widget.geometry().width() * scalep)
-            h = int(widget.geometry().height() * scalep)
-            widget.setGeometry(QRect(x, y, w, h))
-            try:
-                widget.setFont(font)
-            except:
-                pass
-        self.setFixedSize(self.width(), self.height())
+        self.setResolution(self.scalep)
 
 
 
-        # pyqtgraph柱状图
-        self.plot_widget = PlotWidget(self)
-        self.plot_widget.setGeometry(QtCore.QRect(2000* scalep, 1430* scalep, 250* scalep, 250* scalep))
-        self.width_count = np.zeros(30)
-        self.x = np.arange(30)
-        y = np.zeros(30)
-        bg = pg.BarGraphItem(x=self.x, y=y, height=0, width=0.8* scalep)
-        self.plot_widget.addItem(bg)
+    def setMenu(self):
+        self.menubar = self.menuBar()  # 获取窗体的菜单栏
 
-        #self.graph.addWidget(self.plot_widget)
-        self.graph.addWidget(self.plot_widget)
-        self.distinguishValue = self.sliderDistinguish.value()
+        self.menu = self.menubar.addMenu("菜单")
+
+
+        # 调整分辨率
+        self.resolution = self.menu.addMenu("分辨率调整")
+        resolution70Action = QAction('70%', self)
+        resolution70Action.triggered.connect(self.resolution70)
+        self.resolution.addAction(resolution70Action)  # Edit下这是copy子项
+        resolution80Action = QAction('80%', self)
+        resolution80Action.triggered.connect(self.resolution80)
+        self.resolution.addAction(resolution80Action)  # Edit下这是copy子项
+        resolution90Action = QAction('90%', self)
+        resolution90Action.triggered.connect(self.resolution90)
+        self.resolution.addAction(resolution90Action)  # Edit下这是copy子项
+        resolution100Action = QAction('100%', self)
+        resolution100Action.triggered.connect(self.resolution100)
+        self.resolution.addAction(resolution100Action)  # Edit下这是copy子项
+        # 展示好看的柱状图
+        self.showBar = QAction("生成柱状图", self)
+        self.showBar.setShortcut("Ctrl+p")  # 设置快捷键
+        self.showBar.triggered.connect(self.showMatplotlibBar)
+        self.menu.addAction(self.showBar)
+        # 导出结果表
+        self.exportCSV = QAction("导出csv", self)
+        self.exportCSV.setShortcut("Ctrl+s")  # 设置快捷键
+        self.exportCSV.triggered.connect(self.buttonSaveEvent)
+        self.menu.addAction(self.exportCSV)
+        #self.file.triggered[QAction].connect(self.processtrigger)
+        # 帮助
+        self.help = QAction("帮助", self)
+        self.help.setShortcut("Ctrl+h")  # 设置快捷键
+        self.help.triggered.connect(self.showHelpDialog)
+        self.menu.addAction(self.help)
+    def showHelpDialog(self):
+        dialog = QDialog()
+        word = QLabel("------------------------帮助页面----------------------------------\n"
+                      "\n1. 左侧列表单击选择图片"
+                      "\n 2. 鼠标在右上角的缩略图中单击、滑动滚轮，进行图像移动和放缩"
+                      "\n 3. 标注毛发"
+                      "\n   - 左击得到一系列标注点（单根超过三个点会进行曲线拟合）"
+                      "\n   - 按下空格键，确认保存此根毛发并自动检测宽度"
+                      "\n   - 右键选中最近的毛发，WASD调整位置、方向键 ↑ ↓ 调整宽度"
+                      "\n   - 回车键删除选中的毛发"
+                      "\n 4. 自动提取宽度不准时的做法"
+                      "\n   - 查看二值图，切换二值图方式或调整阈值"
+                      "\n   - 方向键手动调整宽度"
+                      "\n 5. 单击“拔毛”按钮，已标注的毛发在右上角缩略图中会消失。"
+                      "\n    每完成一部分毛发标注后，通过“拔毛”来检查是否有漏标注",
+                    dialog)
+        dialog.setGeometry(QRect(500, 500, 500, 400))
+        # btn = QPushButton("已导出结果至 result.csv", dialog)
+        # btn.move(50, 50)
+        dialog.setWindowTitle("message")
+        dialog.setWindowModality(Qt.ApplicationModal)
+        dialog.exec_()
+
+
 
     def initUI(self):
 
@@ -206,10 +223,10 @@ class Mark(QMainWindow):
 
 
 
-        self.radioBinaryFlag.toggled.connect(self.binaryChecked)
 
 
-        self.editDownsample.textChanged.connect(self.downsampleChanged)
+
+
 
 
         self.radioBinaryNormal.toggled.connect(self.binaryChecked_Normal)
@@ -221,14 +238,12 @@ class Mark(QMainWindow):
 
 
 
-        self.checkLengthCorrect.stateChanged.connect(self.lengthCorrectChecked)
+
         self.checkPlotFlag.stateChanged.connect(self.plotChecked)
         self.checkMagnetFlag.stateChanged.connect(self.magnetChecked)
 
      
 
-
-        self.buttonSave.clicked.connect(self.buttonSaveEvent)
         self.buttonImpaint.clicked.connect(self.buttonImpaintEvent)
 
 
@@ -287,6 +302,9 @@ class Mark(QMainWindow):
                 [x, y] = [event.pos().x(), event.pos().y()]
 
                 [x0,x1,y0,y1] = self.roiInf_corrected
+                window = self.roi_window
+                xx,yy=x*self.roi_window / self.labelImg.width(),y*self.roi_window / self.labelImg.width()
+                zz,xxx=self.labelImg.width(),self.labelImg.height()
                 point = [int(x0+x*self.roi_window / self.labelImg.width()), int(y0+y*self.roi_window / self.labelImg.width())]
                 if (point[0] > 0 and point[1] > 0):
                     if event.button() == Qt.LeftButton:
@@ -322,21 +340,6 @@ class Mark(QMainWindow):
                         self.imshow()
 
 
-                        # # 自动识别框
-                        # pkg = auto_search(self.getBinary(), [point[0], point[1]], self.box_width_init, self.box_height_init,
-                        #                  is_length_correct=self.lengthCorrect)
-                        # # 保存结果
-                        # is_find = pkg['is_find']
-                        # if (is_find):
-                        #     box = pkg['box']
-                        #     rect = pkg['rect']
-                        #     [[x, y], [w, h], angle] = rect
-                        #     x1 = x - w/2 * cos(angle / 57.3)
-                        #     y1 = y - w/2 * sin(angle / 57.3)
-                        #     x2 = x + w / 2 * cos(angle / 57.3)
-                        #     y2 = y + w / 2 * sin(angle / 57.3)
-                        #     self.result.append({'joints':[[x1,y1],[x2,y2]], 'rect': rect, 'box': box, 'width': rect[1][1], 'mid':getMidPoint([[x1,y1],[x2,y2]])})
-                        # self.imshow()
                     elif event.button() == Qt.RightButton:
                         self.checkThisHair()
                         #self.handle_bone = False
@@ -524,7 +527,7 @@ class Mark(QMainWindow):
 
 
         # 绘制统计信息图
-        self.width_count = np.zeros(30,dtype=np.uint8)
+        self.width_count = np.zeros(30,dtype=np.uint16)
         for result_ in self.result:
             width = result_['width']
             if(width>30):   # 暂时认为不存在超过30宽度的毛发，后面改成自适应数组
@@ -575,23 +578,10 @@ class Mark(QMainWindow):
             self.isPlot = True
         self.imshow()
 
-    def lengthCorrectChecked(self,isChecked):
-        if(isChecked==0):
-            self.lengthCorrect = False
-        else:
-            self.lengthCorrect = True
 
 
-        #self.imshow()
-    def downsampleChanged(self):
-        self.downsample_ratio = float(self.editDownsample.text())
-        self.editDownsample.clearFocus()
-        self.itemClick()
 
-    def binaryChecked(self,isChecked):
-        if isChecked:
-            self.show_type = BINARY
-        self.imshow(update=True)
+
     # 二值图生成方式选择
     def binaryChecked_Normal(self,isChecked):
         if isChecked:
@@ -623,31 +613,32 @@ class Mark(QMainWindow):
 
     
     def buttonSaveEvent(self):
-        f = open('result.csv', 'w', encoding='utf-8',newline ="")
+        try:
+            f = open('result.csv', 'w', encoding='utf-8',newline ="")
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(["index",'sum']+np.linspace(1,24,24).tolist())
+            json_files = glob.glob(imgPath + '*.json')
+            for json_file in json_files:
+                result, result_origin = self.loadJson(json_file)
+                width_count = np.zeros(25)
+                sum = 0
+                for result_ in result:
+                    width = result_['width']
+                    if(width>24):
+                        continue
+                    width_count[int(width)] += 1
+                    sum += 1
 
-        csv_writer = csv.writer(f)
+                csv_writer.writerow([os.path.basename(json_file).split('.')[0], sum] + width_count[1:].tolist())
+            f.close()
 
-        # 3. 构建列表头
-        csv_writer.writerow(["index",'sum']+np.linspace(1,24,24).tolist())
+            msg_box = QMessageBox.about(self, '导出结果', '已导出结果至 result.csv')
+            #msg_box.exec_()
+        except:
+            msg_box = QMessageBox(QMessageBox.Warning, '导出结果', '导出失败，请检查csv文件是否被占用')
+        msg_box.exec_()
+      #  msg_box = QMessageBox(QMessageBox.Warning, '警告', '已导出结果至 result.csv')
 
-
-
-
-
-        json_files = glob.glob(imgPath + '*.json')
-        for json_file in json_files:
-            result, result_origin = self.loadJson(json_file)
-            width_count = np.zeros(25)
-            sum = 0
-            for result_ in result:
-                width = result_['width']
-                if(width>24):
-                    continue
-                width_count[int(width)] += 1
-                sum += 1
-
-            csv_writer.writerow([os.path.basename(json_file).split('.')[0], sum] + width_count[1:].tolist())
-        f.close()
 
     def getBinary(self, update=False):
 
@@ -703,8 +694,84 @@ class Mark(QMainWindow):
 
         return None
 
+    def setResolution(self,scalep):
+        def findChildrenWidget(widget, allWidgetList):
+            if len(widget.children()) > 0:
+                for cwidget in widget.children():
+                    allWidgetList.append(cwidget)
+                    findChildrenWidget(cwidget, allWidgetList)
+            return allWidgetList
 
 
+        x0 = int(scalep * self.geometry().width())
+        y0 = int(scalep * self.geometry().height())
+        self.resize(x0, y0)
+
+
+        self.fontSize =  round(self.fontSize * scalep)
+        font = QtGui.QFont()
+        font.setFamily("Arial")  # 括号里可以设置成自己想要的其它字体
+        font.setPointSize(self.fontSize)  # 括号里的数字可以设置成自己想要的字体大小
+
+
+        # 缩放UI元素
+        widgetList = []
+        allWidgetList = []
+        allWidgetList = findChildrenWidget(self.centralwidget, allWidgetList)
+        for widget in allWidgetList:
+            if isinstance(widget, QPropertyAnimation) or "qt_" in widget.objectName() or widget.objectName() == '':
+                continue
+            widgetList.append(widget)
+        for widget in widgetList:
+            x = int(widget.geometry().x() * scalep)
+            y = int(widget.geometry().y() * scalep)
+            w = int(widget.geometry().width() * scalep)
+            h = int(widget.geometry().height() * scalep)
+            widget.setGeometry(QRect(x, y, w, h))
+
+            try:
+                widget.setFont(font)
+            except:
+                pass
+        self.setFixedSize(x0, y0)
+
+
+
+        # pyqtgraph柱状图
+        self.plot_widget = PlotWidget(self)
+        self.plot_widget.setGeometry(QtCore.QRect(int(2000* scalep), int(1430* scalep), int(250* scalep), int(250* scalep)))
+        self.width_count = np.zeros(30)
+        self.x = np.arange(30)
+        y = np.zeros(30)
+        bg = pg.BarGraphItem(x=self.x, y=y, height=0, width=0.8* scalep)
+        self.plot_widget.addItem(bg)
+
+        #self.graph.addWidget(self.plot_widget)
+        for i in range(self.graph.count()):
+            self.graph.itemAt(i).widget().deleteLater()
+
+        self.graph.addWidget(self.plot_widget)
+        self.distinguishValue = self.sliderDistinguish.value()
+
+    def changeResolution(self,ratio,scalep):
+        self.setResolution(ratio / scalep)
+        self.scalep = ratio * self.scalepFix
+        self.img_size = (self.labelImg.width(), self.labelImg.height())
+        self.roi_size = (self.labelImg_roi.width(), self.labelImg_roi.height())
+        self.imshow()
+        self.imshow_small_picture()
+
+    def resolution70(self):
+        self.changeResolution(0.7,self.scalep)
+
+    def resolution80(self):
+        self.changeResolution(0.8, self.scalep)
+
+    def resolution90(self):
+        self.changeResolution(0.88, self.scalep)
+
+    def resolution100(self):
+        self.changeResolution(0.95, self.scalep)
 
 
     def distinguishUpdate(self,value):
@@ -748,8 +815,18 @@ class Mark(QMainWindow):
         # cv.imshow('aaa',img_inpaint)
         # cv.waitKey(0)
 
-
-
+    def showMatplotlibBar(self):
+        # matplotlib绘制更好看的柱状图。。。。
+        plt.figure()
+        plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+        num_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        plt.bar(num_list, self.width_count[:20], color="lightseagreen", tick_label=num_list)
+        for a, b in zip(num_list, self.width_count[:20]):
+            plt.text(a, b + 0.1, b, ha='center', va='bottom')  # 每个柱顶部显示数值
+        plt.xlabel('宽度')
+        plt.ylabel('数量')
+        plt.title(os.path.basename(self.tmp.split('.')[0]))
+        plt.show()
 
 
 
@@ -801,7 +878,7 @@ class Mark(QMainWindow):
             self.downsample_ratio = 1
         src = cv.resize(src,(int(src.shape[1]/self.downsample_ratio),int(src.shape[0]/self.downsample_ratio)))
 
-        self.editDownsample.setText(str(self.downsample_ratio))
+
         # 加载标注文件
         self.result, self.result_origin = self.loadJson(self.tmp + '.json')
 
@@ -1040,17 +1117,6 @@ class Mark(QMainWindow):
             self.handle_index = -1  
             self.imshow()
 
-        elif QKeyEvent.key() == Qt.Key_P:  # 变窄
-            # matplotlib绘制更好看的柱状图。。。。
-            plt.figure()
-            plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
-            num_list = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
-            plt.bar(num_list, self.width_count[:20], color="lightseagreen", tick_label=num_list)
-            for a, b in zip(num_list, self.width_count[:20]):
-                plt.text(a, b + 0.1, b, ha='center', va='bottom')  # 每个柱顶部显示数值
-            plt.xlabel('宽度')
-            plt.ylabel('数量')
-            plt.show()
 
 
         if len(joints)==2:
@@ -1100,7 +1166,7 @@ class Mark(QMainWindow):
             for data in datas:
                 if len(data['joints'])<2:
                     continue
-                if data['width']==0 or isnan(data['mid'][0]):
+                if data['width']<=1 or isnan(data['mid'][0]):
                     continue
 
                 # print(data['mid'][0])
