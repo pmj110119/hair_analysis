@@ -93,9 +93,10 @@ class Mark(QMainWindow):
         self.binary_aoto_with_dl = None
 
         self.result=[]
-        self.result_origin=[]
+
         self.result_bone=[]
         self.handle_bone = False
+        self.inner_stack = []
         self.box_width_init = 20
         self.box_height_init = 60
         self.binary_threshold = 150
@@ -300,44 +301,61 @@ class Mark(QMainWindow):
                 if self.img_loaded == False:
                     return QMainWindow.eventFilter(self, source, event)
                 [x, y] = [event.pos().x(), event.pos().y()]
-
                 [x0,x1,y0,y1] = self.roiInf_corrected
-                window = self.roi_window
-                xx,yy=x*self.roi_window / self.labelImg.width(),y*self.roi_window / self.labelImg.width()
-                zz,xxx=self.labelImg.width(),self.labelImg.height()
                 point = [int(x0+x*self.roi_window / self.labelImg.width()), int(y0+y*self.roi_window / self.labelImg.width())]
                 if (point[0] > 0 and point[1] > 0):
-                    if event.button() == Qt.LeftButton:
-                        if self.magnet_flag:
-                            point = process.magnet(point,self.getBinary())
-                            point[0] = np.clip(point[0],0,self.image_origin.shape[1])
-                            point[1] = np.clip(point[1],0,self.image_origin.shape[0])
-                        if self.handle_bone == False:  # 新骨架
-                            bone = [point]
-                            self.result_bone.append(bone)
-                            self.handle_bone = True
-                        else:
-                            self.result_bone[-1].append(point)
-                            self.result.pop(-1)
-                            self.result_origin.pop(-1)
 
-                        if len(self.result_bone[-1]) < 2:   # ！！！！
-                            mid = self.result_bone[-1][0]
-                            self.result.append({'joints': self.result_bone[-1],'width': 1,
-                                                'mid': mid})
-                            self.result_origin.append(
-                                {'joints': self.listModift(self.result_bone[-1]),
-                                 'width': 1,
-                                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
+                    if event.button() == Qt.LeftButton:
+                        innerHandle = True
+                        if innerHandle == True:
+                            if self.roiInf_corrected is not None:
+                                x0, x1, y0, y1 = self.roiInf_corrected
+                                x_clip_min = x0
+                                x_clip_max = x1
+                                y_clip_min = y0
+                                y_clip_max = y1
+                            else:
+                                x_clip_min = 0
+                                x_clip_max = self.image_origin.shape[1]
+                                y_clip_min = 0
+                                y_clip_max = self.image_origin.shape[0]
+
+                            x_min = np.clip(point[0] - 100, x_clip_min, x_clip_max)
+                            x_max = np.clip(point[0] + 100, x_clip_min, x_clip_max)
+                            y_min = np.clip(point[1] - 100, y_clip_min, y_clip_max)
+                            y_max = np.clip(point[1] + 100, y_clip_min, y_clip_max)
+
+                            inner_binary = process.innerBinary(self.image_origin[y_min:y_max,x_min:x_max], [point[0]-x_min, point[1]-y_min])
+                            self.inner_stack.append([[x_min,x_max,y_min,y_max], inner_binary])
+
+                            self.imshow(inner_handle=True)
+
                         else:
-                            mid = getMidPoint(self.result_bone[-1])
-                            self.result.append({'joints': self.result_bone[-1], 'width': 1,
-                                                'mid': mid})
-                            self.result_origin.append(
-                                {'joints': self.listModift(self.result_bone[-1]),
-                                 'width': 1,
-                                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
-                        self.imshow()
+                            if self.magnet_flag:    # 吸铁石
+                                point = process.magnet(point,self.getBinary())
+                                point[0] = np.clip(point[0],0,self.image_origin.shape[1])
+                                point[1] = np.clip(point[1],0,self.image_origin.shape[0])
+
+                            if self.handle_bone == False:  # 新骨架
+                                bone = [point]
+                                self.result_bone.append(bone)
+                                self.handle_bone = True
+                            else:
+                                self.result_bone[-1].append(point)
+                                self.result.pop(-1)
+
+
+                            if len(self.result_bone[-1]) < 2:   # ！！！！
+                                mid = self.result_bone[-1][0]
+                                self.result.append({'joints': self.result_bone[-1],'width': 1,
+                                                    'mid': mid})
+
+                            else:
+                                mid = getMidPoint(self.result_bone[-1])
+                                self.result.append({'joints': self.result_bone[-1], 'width': 1,
+                                                    'mid': mid})
+
+                            self.imshow()
 
 
                     elif event.button() == Qt.RightButton:
@@ -477,8 +495,31 @@ class Mark(QMainWindow):
 
 
 
-    def imshow(self,update=False,plot=True):
-        self.label_img = self.getImage(update)
+    def imshow(self,update=False,plot=True, inner_handle=True):
+        self.label_img = self.getImage(update).copy()
+
+
+        if inner_handle:
+            for [x_min,x_max,y_min,y_max],inner_binary in self.inner_stack:
+                # if self.roiInf_corrected is not None:
+                #     x0, x1, y0, y1 = self.roiInf_corrected
+                #     x_min -= x0
+                #     x_max -= x0
+                #     y_min -= y0
+                #     y_max -= y0
+                roi_img = self.label_img[y_min:y_max, x_min:x_max]
+
+                try:
+                    fg = cv.bitwise_and(roi_img, roi_img, mask=inner_binary)
+                except:
+                    print(roi_img.shape,inner_binary.shape,[x_min,x_max,y_min,y_max])
+                bg = roi_img-fg
+                new_fg = np.zeros_like(roi_img)
+                new_fg[:,:,1] = inner_binary
+                new_fg = new_fg + bg
+                self.label_img[y_min:y_max, x_min:x_max] = new_fg
+
+
         temp = curve_plot(self.label_img, self.result, self.distinguishValue/self.downsample_ratio,(255, 0, 0),alpha=self.plot_alpha, roi=self.roiInf_corrected)
 
         if self.isPlot==True:
@@ -525,7 +566,6 @@ class Mark(QMainWindow):
 
 
 
-
         # 绘制统计信息图
         self.width_count = np.zeros(30,dtype=np.uint16)
         for result_ in self.result:
@@ -559,7 +599,7 @@ class Mark(QMainWindow):
 
 
 
-        json_str = json.dumps(self.result_origin, indent=4, cls=NpEncoder)
+        json_str = json.dumps(self.result, indent=4, cls=NpEncoder)
         with open(self.tmp + '.json', 'w') as json_file:
             json_file.write(json_str)
 
@@ -927,7 +967,7 @@ class Mark(QMainWindow):
         if self.handle_bone == True:
             self.handle_bone = False
             self.result.pop(-1)
-            self.result_origin.pop(-1)
+
             if len(self.result_bone[-1]) >= 2:
                 joint_temp = self.result_bone[-1]
 
@@ -936,8 +976,7 @@ class Mark(QMainWindow):
 
                 mid = getMidPoint(self.result_bone[-1])
                 self.result.append({'joints': self.result_bone[-1], 'width': height, 'mid': mid})
-                self.result_origin.append({'joints': self.listModift(self.result_bone[-1]), 'width': int(height*self.downsample_ratio),
-                                    'mid': [mid[0]*self.downsample_ratio, mid[1]*self.downsample_ratio]})
+
 
     def generateHairPath(self):
         if self.handle_bone == True:
@@ -977,17 +1016,14 @@ class Mark(QMainWindow):
 
 
                 self.result.pop(-1)
-                self.result_origin.pop(-1)
+
 
                 height = process.waist(joints,self.getBinary())
                 mid = getMidPoint(joints)
 
                 self.result.append({'joints': joints, 'width': height, 'mid': mid})
-                self.result_origin.append({'joints': self.listModift(joints), 'width': int(height*self.downsample_ratio),
-                                    'mid': [mid[0]*self.downsample_ratio, mid[1]*self.downsample_ratio]})
 
            
-
 
     # 捕捉键盘事件
 
@@ -1006,12 +1042,45 @@ class Mark(QMainWindow):
             self.imshow()
             return
         elif QKeyEvent.key() == Qt.Key_Q:
-            begin = time.time()
             self.generateHairPath()
-            begin1 = time.time()
             self.imshow()
             return
+        elif QKeyEvent.key() == Qt.Key_I:
+            if len(self.inner_stack)<=0:
+                return
+            x_min = 9999
+            x_max = 0
+            y_min = 9999
+            y_max = 0
+            for [x0, x1, y0, y1], _ in self.inner_stack:
+                x_min = min(x_min,x0)
+                x_max = max(x_max,x1)
+                y_min = min(y_min, y0)
+                y_max = max(y_max, y1)
+            inner_binary_merged = np.zeros((y_max-y_min, x_max-x_min),np.uint8)
+            for [x0, x1, y0, y1],roi_binary in self.inner_stack:
+                inner_binary_merged[(y0-y_min):(y1-y_min), (x0-x_min):(x1-x_min)] += roi_binary
+            inner_binary_merged = (inner_binary_merged>0).astype(np.uint8)*255
 
+            endpoints = process.endpointDetection(inner_binary_merged)
+            hair_pairs = process.endpointPair(inner_binary_merged,endpoints)
+
+            temp_result = []
+            for joints in hair_pairs:
+                height = process.waist(joints, inner_binary_merged)
+                for joint in joints:
+                    joint[0] = joint[0] + x_min
+                    joint[1] = joint[1] + y_min
+                mid = getMidPoint(joints)
+                temp_result.append({'joints': joints, 'width': height, 'mid': mid})
+            self.result += temp_result
+
+            self.inner_stack = []
+            self.imshow()
+            # cv.imshow('zzz',inner_binary_merged)
+            # cv.waitKey(0)
+
+            return
 
 
 
@@ -1021,7 +1090,7 @@ class Mark(QMainWindow):
         if QKeyEvent.key()== Qt.Key_Backspace:  # 删除
             self.handle_bone = False
             self.result.pop(self.handle_index)
-            self.result_origin.pop(self.handle_index)
+
 
             if len(self.result)==0:
                 self.handle_index = -2
@@ -1045,11 +1114,8 @@ class Mark(QMainWindow):
                 joint[0] -= 1
             mid = getMidPoint(joints)
             self.result.pop(self.handle_index)
-            self.result_origin.pop(self.handle_index)
             self.result.append({'joints':joints, 'width':width,'mid':mid})
-            self.result_origin.append(
-                {'joints': self.listModift(joints), 'width': int(width*self.downsample_ratio),
-                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
+
             self.handle_index = -1      # 修正后，对应目标的序号必定变为-1
             self.imshow()
 
@@ -1059,11 +1125,8 @@ class Mark(QMainWindow):
                 joint[0] += 1
             mid = getMidPoint(joints)
             self.result.pop(self.handle_index)
-            self.result_origin.pop(self.handle_index)
             self.result.append({'joints':joints, 'width':width,'mid':mid})
-            self.result_origin.append(
-                {'joints': self.listModift(joints), 'width': int(width*self.downsample_ratio),
-                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
+
             self.handle_index = -1  
             self.imshow()
 
@@ -1073,11 +1136,9 @@ class Mark(QMainWindow):
                 joint[1] += 1
             mid = getMidPoint(joints)
             self.result.pop(self.handle_index)
-            self.result_origin.pop(self.handle_index)
+
             self.result.append({'joints':joints, 'width':width,'mid':mid})
-            self.result_origin.append(
-                {'joints': self.listModift(joints), 'width': int(width*self.downsample_ratio),
-                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
+
             self.handle_index = -1  
             self.imshow()
 
@@ -1086,11 +1147,7 @@ class Mark(QMainWindow):
                 joint[1] -= 1
             mid = getMidPoint(joints)
             self.result.pop(self.handle_index)
-            self.result_origin.pop(self.handle_index)
             self.result.append({'joints':joints, 'width':width,'mid':mid})
-            self.result_origin.append(
-                {'joints': self.listModift(joints), 'width': int(width*self.downsample_ratio),
-                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
             self.handle_index = -1  
             self.imshow()
 
@@ -1098,22 +1155,14 @@ class Mark(QMainWindow):
         elif QKeyEvent.key()== Qt.Key_Up:  # 变宽
             width += 1
             self.result.pop(self.handle_index)
-            self.result_origin.pop(self.handle_index)
             self.result.append({'joints':joints, 'width':width,'mid':mid})
-            self.result_origin.append(
-                {'joints': self.listModift(joints), 'width': int(width*self.downsample_ratio),
-                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
             self.handle_index = -1  
             self.imshow()
 
         elif QKeyEvent.key()== Qt.Key_Down:   # 变窄
             width -= 1
             self.result.pop(self.handle_index)
-            self.result_origin.pop(self.handle_index)
             self.result.append({'joints':joints,  'width':width,'mid':mid})
-            self.result_origin.append(
-                {'joints': self.listModift(joints), 'width': int(width*self.downsample_ratio),
-                 'mid': [mid[0] * self.downsample_ratio, mid[1] * self.downsample_ratio]})
             self.handle_index = -1  
             self.imshow()
 

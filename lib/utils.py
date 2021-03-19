@@ -1,5 +1,33 @@
 import numpy as np
 from math import *
+import cv2
+
+
+def imageMergeMask(img, mask, invert=False):
+    # 掩模显示背景
+    img1_bg = cv2.bitwise_and(roi, roi, mask=mask)
+
+    cv2.imshow('img1_bg', img1_bg)
+    cv2.waitKey(0)
+
+    # 掩模显示前景
+    # Take only region of logo from logo image.
+    img2_fg = cv2.bitwise_and(img2, img2, mask=mask_inv)
+    cv2.imshow('img2_fg', img2_fg)
+    cv2.waitKey(0)
+
+    # 前背景图像叠加
+    # Put logo in ROI and modify the main image
+    dst = cv2.add(img1_bg, img2_fg)
+    img1[0:rows, 0:cols] = dst
+
+    cv2.imshow('res', img1)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    img1[0:rows, 0:cols] = dst
+
+
 
 # 返回narray中最接近给定值的值
 def findNearest(a, a0):

@@ -112,6 +112,47 @@ class BasicProcess():
             joints.append([path_joints[-1][1], path_joints[-1][0]])
         return joints, length
 
+    # 栋栋
+    def innerBinary(self, img_bgr, point):
+        """[输入单个点坐标，区域生长得到二值图]
+            Args:
+                img_bgr (ndarray): [三通道图像]
+                point (list):      [点坐标]      样例 --> [x,y]  --->[列，行]
+            Returns:
+                binary (ndarray):  [单通道图像]
+        """
+        _,binary = cv2.threshold(cv2.cvtColor(img_bgr,cv2.COLOR_BGR2GRAY),70,255, cv2.THRESH_BINARY_INV)
+        return binary
+    # 代超
+    def endpointDetection(self, img_binary):
+        """[输入二值图，输出所有检测到的端点]
+            Args:
+                img_binary (ndarray):   [单通道二值图]
+            Returns:
+                points (list):          [点坐标序列]     样例 --> [[x0,y0],[x1,y1],[x2,y2]]
+        """
+        return [[10,10],[50,50], [20,10], [5,70]]
+    # 钧杰师兄
+    def endpointPair(self, img_binary, endpoints):     # 输入示例： [[10,10],[50,50], [20,10], [5,70]]
+        """[输入二值图和代超检测到的端点，输出配对后的毛发点序列]
+            Args:
+                img_binary (ndarray):   [单通道二值图]
+                endpoints (list):       [点坐标序列]     样例 --> [[x0,y0],[x1,y1],[x2,y2]]
+            Returns:
+                pairpoints (list):
+                    输出示例:
+                    [
+                      [[x0,y0],[x1,y1],[x2,y2],[x3,y3]],
+                      [[x0,y0],[x1,y1],[x2,y2],[x3,y3]],
+                      [[x0,y0],[x1,y1],[x2,y2],[x3,y3]]
+                    ]
+        """
+        pairpoints = [[endpoints[0],endpoints[1]], [endpoints[2],endpoints[3]] ]
+        for pair in pairpoints:
+            pair = midUpsample(pair)
+        return pairpoints
+
+
 class MyProcess(BasicProcess):
     # 吸铁石
     def magnet(self,point, img_binary, size=12):

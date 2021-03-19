@@ -355,7 +355,7 @@ def fitCurve(joint):
         return joint
 
 
-def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 100, 200),alpha=1,roi=None,handle_diff=None,handle_width=None):
+def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 100, 200),alpha=1,roi=None,handle_diff=None,handle_width=None, inner_stack=None):
     if roi is not None:
         x0, x1, y0, y1 = roi
         img = img[y0:y1, x0:x1]
@@ -364,10 +364,13 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
     if handle_diff is not None:
         x0, y0 = handle_diff
 
-
     if len(img.shape)==2:
         img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
     src = img.copy()
+
+
+
+
     img_color = Image.fromarray(img)
     draw_img = ImageDraw.Draw(img_color)  # 实例化一个ImageDraw
 
