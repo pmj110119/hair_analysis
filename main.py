@@ -123,6 +123,8 @@ class Mark(QMainWindow):
         self.tmp = 'default'
 
         self.mousePressFlag = False
+
+        self.innerHandle = True
         self.initUI()
 
     # 根据屏幕分辨率设置界面大小
@@ -223,24 +225,18 @@ class Mark(QMainWindow):
 
 
 
-
-
-
-
-
-
-
         self.radioBinaryNormal.toggled.connect(self.binaryChecked_Normal)
         self.radioBinaryAuto.toggled.connect(self.binaryChecked_Auto)
         self.radioBinaryDL.toggled.connect(self.binaryChecked_DL)
         # self.radioBinaryAutoWithDL.toggled.connect(self.binaryChecked_AutoWithDL)
         # self.radioBinaryCluster.toggled.connect(self.binaryChecked_Cluster)
 
+        # 手动标注模式的选择
+        self.radioHangleModeAuto.toggled.connect(self.handleModeChanged_Auto)
+        self.radioHangleModeHandle.toggled.connect(self.handleModeChanged_Handle)
 
 
 
-
-        self.checkPlotFlag.stateChanged.connect(self.plotChecked)
         self.checkMagnetFlag.stateChanged.connect(self.magnetChecked)
 
      
@@ -249,7 +245,7 @@ class Mark(QMainWindow):
 
 
 
-        
+        self.innerClear()
         # self.my_thread.mysignal.connect(self.zhi)  # 自定义信号连接
 
 
@@ -288,11 +284,11 @@ class Mark(QMainWindow):
             if event.type() == QEvent.Wheel:
                 whell_angle = event.angleDelta()
                 if whell_angle.y() > 0:
-                    self.plot_alpha+=0.15
-                    if self.plot_alpha>=0.6:
-                        self.plot_alpha=0.6
+                    self.plot_alpha+=0.2
+                    if self.plot_alpha>1.0:
+                        self.plot_alpha=1.0
                 else:
-                    self.plot_alpha -= 0.15
+                    self.plot_alpha -= 0.2
                     if self.plot_alpha < 0:
                         self.plot_alpha = 0
                 self.imshow()
@@ -306,8 +302,7 @@ class Mark(QMainWindow):
                 if (point[0] > 0 and point[1] > 0):
 
                     if event.button() == Qt.LeftButton:
-                        innerHandle = True
-                        if innerHandle == True:
+                        if self.innerHandle == True:
                             if self.roiInf_corrected is not None:
                                 x0, x1, y0, y1 = self.roiInf_corrected
                                 x_clip_min = x0
@@ -429,7 +424,7 @@ class Mark(QMainWindow):
 
     def getImage(self,update=False):
         img={
-            1: self.image_filter,
+            1: self.image_origin,
             BINARY: self.getBinary(update),
         }
         return img[1]
@@ -611,12 +606,7 @@ class Mark(QMainWindow):
         else:
             self.magnet_flag = True
 
-    def plotChecked(self, isChecked):
-        if (isChecked == 0):
-            self.isPlot = False
-        else:
-            self.isPlot = True
-        self.imshow()
+
 
 
 
@@ -643,12 +633,22 @@ class Mark(QMainWindow):
     #         self.binary_type = BINARY_AUTO_WITH_DL
     #         self.getBinary(True)
     #     self.imshow()
-    # def binaryChecked_Cluster(self,isChecked) :
-    #     if isChecked:
-    #         self.binary_type = BINARY_Cluster
-    #         self.getBinary(True)
-    #     self.imshow()
 
+    def innerClear(self):
+        try:
+            self.inner_stack=[]
+            self.imshow()
+        except:
+            print('clear failed')
+
+    def handleModeChanged_Auto(self,isChecked) :
+        if isChecked:
+            self.innerHandle = True
+            self.innerClear()
+    def handleModeChanged_Handle(self,isChecked) :
+        if isChecked:
+            self.innerHandle = False
+            self.innerClear()
 
 
     
@@ -1060,10 +1060,10 @@ class Mark(QMainWindow):
             inner_binary_merged = np.zeros((y_max-y_min, x_max-x_min),np.uint8)
             for [x0, x1, y0, y1],roi_binary in self.inner_stack:
                 inner_binary_merged[(y0-y_min):(y1-y_min), (x0-x_min):(x1-x_min)] += roi_binary
-            inner_binary_merged = (inner_binary_merged>0).astype(np.uint8)*255
+            inner_binary_merged = (inner_binary_merged>0).astype(np.uint8)
 
-            endpoints = process.endpointDetection(inner_binary_merged)
-            hair_pairs = process.endpointPair(inner_binary_merged,endpoints)
+
+            hair_pairs = process.autoSkeletonExtraction(inner_binary_merged)
 
             temp_result = []
             for joints in hair_pairs:
@@ -1081,7 +1081,10 @@ class Mark(QMainWindow):
             # cv.waitKey(0)
 
             return
-
+        elif QKeyEvent.key() == Qt.Key_O:
+            self.innerClear()
+            self.imshow()
+            return
 
 
         #参数1  控件

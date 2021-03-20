@@ -7,6 +7,7 @@ from lib.shortestPath import getShortestPath
 from scipy import stats
 from lib.endpointDetection import endpointDetection
 from lib.skeletonExtraction import skeletonExtraction
+from lib.innerBinary import innerBinary
 #from lib.clusterBinary import myAggCluster
 class BasicProcess():
 
@@ -122,7 +123,8 @@ class BasicProcess():
             Returns:
                 binary (ndarray):  [单通道图像]
         """
-        _,binary = cv2.threshold(cv2.cvtColor(img_bgr,cv2.COLOR_BGR2GRAY),70,255, cv2.THRESH_BINARY_INV)
+        binary = innerBinary(img_bgr,point,debug=True)
+        cv2.waitKey(1)
         return binary
 
     # 代超
