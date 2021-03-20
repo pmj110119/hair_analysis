@@ -17,8 +17,8 @@
    <widget class="QPushButton" name="buttonImpaint">
     <property name="geometry">
      <rect>
-      <x>850</x>
-      <y>180</y>
+      <x>780</x>
+      <y>100</y>
       <width>111</width>
       <height>41</height>
      </rect>
@@ -604,30 +604,6 @@ number</string>
      <string>缩略图</string>
     </property>
    </widget>
-   <widget class="QCheckBox" name="checkPlotFlag">
-    <property name="geometry">
-     <rect>
-      <x>80</x>
-      <y>40</y>
-      <width>181</width>
-      <height>28</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>10</pointsize>
-     </font>
-    </property>
-    <property name="focusPolicy">
-     <enum>Qt::NoFocus</enum>
-    </property>
-    <property name="text">
-     <string>显示已标注</string>
-    </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
-   </widget>
    <widget class="QGroupBox" name="groupBox">
     <property name="geometry">
      <rect>
@@ -839,9 +815,9 @@ Unet segmentation</string>
     <property name="geometry">
      <rect>
       <x>80</x>
-      <y>80</y>
-      <width>181</width>
-      <height>28</height>
+      <y>70</y>
+      <width>171</width>
+      <height>51</height>
      </rect>
     </property>
     <property name="font">
@@ -863,8 +839,8 @@ Unet segmentation</string>
    <widget class="QLineEdit" name="lineEditInpaint">
     <property name="geometry">
      <rect>
-      <x>850</x>
-      <y>130</y>
+      <x>780</x>
+      <y>50</y>
       <width>111</width>
       <height>31</height>
      </rect>
@@ -956,6 +932,70 @@ Unet segmentation</string>
      </property>
      <property name="placeholderText">
       <string>20.0</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QGroupBox" name="groupBox_2">
+    <property name="geometry">
+     <rect>
+      <x>720</x>
+      <y>167</y>
+      <width>301</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>标注模式</string>
+    </property>
+    <widget class="QRadioButton" name="radioHangleModeAuto">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>20</y>
+       <width>141</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="focusPolicy">
+      <enum>Qt::NoFocus</enum>
+     </property>
+     <property name="text">
+      <string>魔术棒</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radioHangleModeHandle">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>40</y>
+       <width>141</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="focusPolicy">
+      <enum>Qt::NoFocus</enum>
+     </property>
+     <property name="text">
+      <string>手动</string>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
      </property>
     </widget>
    </widget>

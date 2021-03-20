@@ -7,156 +7,87 @@ import cv2
 import cv2
 import numpy as np
 from scipy import ndimage
-# from lib.myGraph import *
 import matplotlib.pyplot as plt
 import heapq
 
 from numba import jit
 
-# def sub2ind(array_shape, cols, rows):
-#     return rows*array_shape[0] + cols
-
-# def ind2sub(array_shape, ind):
-#     rows = (ind // array_shape[0])
-#     cols = (ind % array_shape[0])
-#     return (cols,rows)
-
-# def my_im2graph(Img,N_conn):
-#     I = Img
-#     D0 = ndimage.distance_transform_edt(I == 1)
-#     D = np.max(D0) - D0 + 1
-#     D_x, D_y = D.shape[:2]
-#     NodeNum = D_x*D_y
-#     s = []
-#     t = []
-#     w = []
-#     NUM = -1
-#     for yind in range(D_y):
-#         for xind in range(D_x):
-#             NUM = NUM + 1
-#             stmp = []
-#             ttmp = []
-#             wtmp = []
-#             for yi in [-1,0,1]:
-#                 for xi in [-1,0,1]:
-#                     if (xi==0 and yi==0)==False:
-#                         xindx = xind + xi
-#                         yindx = yind + yi
-#                         if xindx>=0 and xindx<D_x and yindx>=0 and yindx<D_y and I[xind,yind]==1 and I[xindx,yindx]==1:
-#                             stmp += [NUM]
-#                             ttmp += [sub2ind(D.shape,xindx,yindx)]
-#                             wtmp += [(D[xind,yind]+D[xindx,yindx])/2]
-#             s += stmp
-#             t += ttmp
-#             w += wtmp
-
-#     G = Graph()
-#     gmat = {}
-#     for svalue,tvalue,wvalue in zip(s,t,w):
-#         if svalue not in gmat.keys():
-#             gmat[svalue] = {}
-#         gmat[svalue][tvalue] = wvalue
-#     for key_i in gmat.keys():
-#         for key_j in gmat[key_i].keys():
-#             e = Edge(key_i, key_j, gmat[key_i][key_j])
-#             G.add_edge(e)
-#     return G
-# def getShortestPath(Img,StartPoint,EndPoint):
-#     #try:
-# #         StartInd = sub2ind(Img.shape, StartPoint[0], StartPoint[1])
-# #         EndInd = sub2ind(Img.shape,EndPoint[0],EndPoint[1])
-# #        G = my_im2graph(Img,8)
-# #         path,pathdist = G.find_shortest_path(StartInd, EndInd)
-# #         shortestpath = []
-# #         for pathind in path:
-# #             shortestpath += [list(ind2sub(Img.shape,pathind))]
-#         Start = (StartPoint[0], StartPoint[1])
-#         End = (EndPoint[0], EndPoint[1])
-              
-#         shortestpath,pathdist = find_shortest_path(Img, Start, End)
-#         assert(pathdist is not None)
-#         return shortestpath,pathdist
-#     #except:
-#     #    return [],0
-
 @jit(nopython = True)
-def dijkstra(Img, D, Start, End):
-    
-    if (Img[Start] != 1) or (Img[End] != 1):
-        return [End], np.inf
+def dijkstra(Img, D, Start, Endlist):
     
     rows, cols = D.shape[:2]
-    nodes = []
-    idx = np.zeros((rows, cols), dtype = np.int32)
-    
-    # 给图上空白的格子标号
-    N = 0
-    for i in range(rows):
-        for j in range(cols):
-            if (Img[i, j] == 1) :
-                idx[i, j] = N
-                nodes.append( (np.int32(i), np.int32(j)) )
-                N += 1
-    start, end = idx[ Start ], idx[ End ]
+    stx, sty = Start
+    targets = set()
+    for enx, eny in Endlist:
+        if ( (enx, eny) != (stx, sty) ):
+            targets.add((enx, eny))
     
     # Dijkstra最短路径算法
     ### 初始化
-    dist = np.ones(N) * np.inf
-    dist[start] = 0.
-    last = np.ones(N, dtype = np.int32) * (-1)
-    heap = [(0., start)]
+    dist = np.ones((rows, cols)) * np.inf
+    dist[stx, sty] = D[stx, sty]
+    lastx = np.ones((rows, cols), dtype = np.int32) * (-1)
+    lasty = np.ones((rows, cols), dtype = np.int32) * (-1)
+    heap = [(0., (stx, sty))]
     heapq.heapify(heap)
-    
     ### 迭代
-    for _ in range(N-1):
+    while (True):
             
-        now, nowdist = -1, np.inf
+        nowx, nowy, nowdist = -1, -1, np.inf
         while len(heap):
-            tmpdist, tmp = heapq.heappop(heap)
-            if  (tmpdist > dist[tmp]): # node `now` has been visited before
+            tmpdist, (tmpx, tmpy) = heapq.heappop(heap)
+            if  (tmpdist > dist[tmpx, tmpy]): # node `now` has been visited before
                 continue
             else:
-                now, nowdist = tmp, tmpdist
+                nowx, nowy, nowdist = tmpx, tmpy, tmpdist
                 break
-        if (now == -1) :
+        if (nowx == -1) :
             break
-        dist[now] = nowdist
-        if (now == end) : # there is no need to explore further
+        dist[nowx, nowy] = nowdist
+        if ( (nowx, nowy) in targets):
+            targets.remove((nowx, nowy))
+        if (len(targets) == 0) or (nowdist > 100000.) : # there is no need to explore further
             break
 
-        nowx, nowy = nodes[now]    
         for dx in range(-1, 2):
             for dy in range(-1, 2):
                 if (dx != 0) or (dy != 0):
-                    nextx = nowx + dx
-                    nexty = nowy + dy
-                    if nextx >= 0 and nextx < rows and nexty >= 0 and nexty < cols and Img[nextx,nexty]==1:
-                        nextid = idx[nextx, nexty]
+                    nextx = np.int32(nowx + dx)
+                    nexty = np.int32(nowy + dy)
+                    if nextx >= 0 and nextx < rows and nexty >= 0 and nexty < cols:
                         nextdist = nowdist + D[nextx, nexty]
-                        if (nextdist < dist[nextid]):
-                            dist[nextid] = nextdist
-                            last[nextid] = now
-                            heapq.heappush(heap, (nextdist, nextid))
+                        if (nextdist < dist[nextx, nexty]):
+                            dist[nextx, nexty] = nextdist
+                            lastx[nextx, nexty] = nowx
+                            lasty[nextx, nexty] = nowy
+                            heapq.heappush(heap, (nextdist, (nextx, nexty)))
     
-    # 沿着每个点被访问时的父亲，找出方案
-    shortest_path = [nodes[end]]
-    tmp = end
-    while (last[tmp] > -1):
-        tmp = last[tmp]
-        shortest_path.append(nodes[tmp])
-    shortest_path.reverse()
+    result = []
     
-    return shortest_path, dist[end] + (D[Start]-D[End])/2 
+    for enx, eny in Endlist:
+    
+        # 沿着每个点被访问时的父亲，找出方案
+        shortest_path = [(enx, eny)]
+        tmpx, tmpy = enx, eny
+        while (lastx[tmpx, tmpy] > -1):
+            tmpx, tmpy = (lastx[tmpx, tmpy], lasty[tmpx, tmpy])
+            shortest_path.append((tmpx, tmpy))
+        shortest_path.reverse()
+        
+        result.append( (shortest_path, dist[enx, eny]) )
+    
+    return result
 
 def getShortestPath(Img, Start, End):
     
     D = ndimage.distance_transform_edt(Img == 1)
     D = np.max(D) - D + 1
+    D[Img != 1] = 10000.
     
     x0, y0 = map(np.int32, Start)
     x1, y1 = map(np.int32, End)
     
-    return dijkstra(Img, D, (x0, y0), (x1, y1))
+    return dijkstra(Img, D, (x0, y0), np.array([(x1, y1)]) )[0]
 
 def getBinImage(image_dir,thr):
     image0 = cv2.imread(image_dir, cv2.IMREAD_GRAYSCALE)
@@ -196,9 +127,9 @@ if __name__ == "__main__":
                 print('Calculating....')
                 
                 t0 = time.time()
-                shortestpath,pathdist = getShortestPath(img,StartPoint,EndPoint)
+                shortestpath, dis = getShortestPath(img,StartPoint,EndPoint)
                 print("Time: ", time.time() - t0, " s")
-                print(shortestpath)
+                print(dis, shortestpath)
                 
                 if (len(shortestpath)):
                     shortestpath = np.array(shortestpath)

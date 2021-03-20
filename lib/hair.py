@@ -403,6 +403,8 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
         radius = width / 2
         if radius<3:
             radius=3
+        elif radius>5:
+            radius = 5
         if handle_diff is not None:
             # 画关节点
             for i in range(len(joint)):
