@@ -31,6 +31,8 @@ def dijkstra(Img, D, Start, Endlist):
     heap = [(0., (stx, sty))]
     heapq.heapify(heap)
     ### 迭代
+
+    connected_target = 0
     while (True):
             
         nowx, nowy, nowdist = -1, -1, np.inf
@@ -46,7 +48,16 @@ def dijkstra(Img, D, Start, Endlist):
         dist[nowx, nowy] = nowdist
         if ( (nowx, nowy) in targets):
             targets.remove((nowx, nowy))
-        if (len(targets) == 0) or (nowdist > 100000.) : # there is no need to explore further
+            connected_target += 1
+
+            ####### alpha版本：连通域中只能有两个端点
+            if (connected_target > 1):
+                ###### 找过的路径全部作废
+                dist = np.ones((rows, cols)) * np.inf
+                lastx = np.ones((rows, cols), dtype = np.int32) * (-1)
+                break
+
+        if (len(targets) == 0) or (nowdist > 10000.) : # there is no need to explore further
             break
 
         for dx in range(-1, 2):

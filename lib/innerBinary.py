@@ -17,11 +17,11 @@ def innerBinary(img_bgr, point, debug=False):
         Returns:
             binary(ndarray): [单通道图像]
     """
-    if debug:
-        temp = cv2.cvtColor(img_bgr, cv2.COLOR_RGB2BGR).copy()
-        cv2.circle(temp,(point[0],point[1]),2,(0,255,0),2)
-        cv2.imshow('innerDebug',temp)
-        cv2.waitKey(1)
+    # if debug:
+    #     temp = cv2.cvtColor(img_bgr, cv2.COLOR_RGB2BGR).copy()
+    #     cv2.circle(temp,(point[0],point[1]),2,(0,255,0),2)
+    #     cv2.imshow('innerDebug',temp)
+    #     cv2.waitKey(1)
 
 
 
@@ -29,8 +29,8 @@ def innerBinary(img_bgr, point, debug=False):
     # print(I)
     I_sizes = I.shape
     # print(I_sizes)
-    x = point[0]
-    y = point[1]
+    x = point[1]
+    y = point[0]
     J = np.zeros(I_sizes,dtype=np.uint8)
     # print(I[x,y])
     reg_mean = I[x,y]  

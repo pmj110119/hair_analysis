@@ -65,6 +65,10 @@ if (__name__ == "__main__"):
     
     print("Finding endpoints...")
     endpoints = endpointDetection(binary)
+    plt.imshow(binary, cmap = plt.cm.gray)
+    plt.plot(endpoints[:, 1], endpoints[:, 0], markersize = 1, c = 'red', marker = '.', linewidth = 0)
+    plt.savefig("endpoints.pdf", dpi = 1200)
+    
     print("Extracting skeletons...")
     paths = skeletonExtraction(binary, endpoints)
 

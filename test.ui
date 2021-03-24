@@ -17,10 +17,10 @@
    <widget class="QPushButton" name="buttonImpaint">
     <property name="geometry">
      <rect>
-      <x>780</x>
-      <y>100</y>
-      <width>111</width>
-      <height>41</height>
+      <x>890</x>
+      <y>120</y>
+      <width>91</width>
+      <height>31</height>
      </rect>
     </property>
     <property name="font">
@@ -545,26 +545,6 @@ number</string>
      <string>右图</string>
     </property>
    </widget>
-   <widget class="QLabel" name="label_4">
-    <property name="geometry">
-     <rect>
-      <x>40</x>
-      <y>1000</y>
-      <width>191</width>
-      <height>211</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>11</pointsize>
-     </font>
-    </property>
-    <property name="text">
-     <string>平移：WASD
-调宽：↑↓
-调整透明度：鼠标滚轮</string>
-    </property>
-   </widget>
    <widget class="QListWidget" name="allFiles">
     <property name="geometry">
      <rect>
@@ -792,6 +772,34 @@ Unet segmentation</string>
       <string>20.0</string>
      </property>
     </widget>
+    <widget class="QRadioButton" name="radioBinaryInner">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>190</x>
+       <y>84</y>
+       <width>171</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="focusPolicy">
+      <enum>Qt::NoFocus</enum>
+     </property>
+     <property name="text">
+      <string>内点生长法 
+inner growing</string>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
+    </widget>
    </widget>
    <widget class="QLabel" name="label_13">
     <property name="geometry">
@@ -839,8 +847,8 @@ Unet segmentation</string>
    <widget class="QLineEdit" name="lineEditInpaint">
     <property name="geometry">
      <rect>
-      <x>780</x>
-      <y>50</y>
+      <x>560</x>
+      <y>150</y>
       <width>111</width>
       <height>31</height>
      </rect>
@@ -939,7 +947,7 @@ Unet segmentation</string>
     <property name="geometry">
      <rect>
       <x>720</x>
-      <y>167</y>
+      <y>170</y>
       <width>301</width>
       <height>91</height>
      </rect>
@@ -952,7 +960,7 @@ Unet segmentation</string>
       <rect>
        <x>20</x>
        <y>20</y>
-       <width>141</width>
+       <width>271</width>
        <height>31</height>
       </rect>
      </property>
@@ -965,7 +973,7 @@ Unet segmentation</string>
       <enum>Qt::NoFocus</enum>
      </property>
      <property name="text">
-      <string>魔术棒</string>
+      <string>魔术棒   I键生成   O键删除</string>
      </property>
      <property name="checked">
       <bool>true</bool>
@@ -998,6 +1006,50 @@ Unet segmentation</string>
       <bool>false</bool>
      </property>
     </widget>
+   </widget>
+   <widget class="QPushButton" name="buttonAutoDetect">
+    <property name="geometry">
+     <rect>
+      <x>760</x>
+      <y>120</y>
+      <width>91</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>11</pointsize>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>自动查找</string>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="logBrowser">
+    <property name="geometry">
+     <rect>
+      <x>730</x>
+      <y>6</y>
+      <width>281</width>
+      <height>111</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QProgressBar" name="autoDetectBar">
+    <property name="geometry">
+     <rect>
+      <x>760</x>
+      <y>150</y>
+      <width>121</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="value">
+     <number>0</number>
+    </property>
    </widget>
   </widget>
  </widget>

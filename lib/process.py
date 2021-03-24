@@ -24,7 +24,7 @@ class BasicProcess():
         """        
         return point
 
-    def waist(self,joints,img_binary):
+    def waist(self,joints,img_binary, if_min=True):
         """[自动检测宽度]
 
         Args:
@@ -56,17 +56,26 @@ class BasicProcess():
             # 测宽
             [waist, y_offset] = get_width(tile)
             waist_array[i] = waist
-
+        print(waist_array)
         waist = np.min(waist_array)
         waist_min_count = np.sum(waist_array==waist)
-        if waist_min_count<2:
-            waist_median = floor(findNearest(waist_array, np.median(waist_array)))
-            waist_mean = floor(findNearest(waist_array, np.mean(waist_array)))
-            #waist_mode =  stats.mode(waist_array)[0][0]
-            waist = min(waist_median,waist_mean)
+        if True or waist_min_count<2:
+            waist_median = round(findNearest(waist_array, np.median(waist_array)))
+            waist_mean = round(findNearest(waist_array, np.mean(waist_array)))
+            waist_mode =  stats.mode(waist_array)[0][0]
+            print(waist_median, waist_mean, waist_mode)
+            if if_min:
+                waist = min(waist_median, waist_mean, waist_mode)
+                return int(waist)
+            else:
+                waist = max(waist_median, waist_mean, waist_mode)
+                if waist>3:
+                    waist +=1
+                return int(waist)
+
+        #print(waist)
 
 
-        return int(waist)
 
     def border(self,joints,img_binary):
         """[修正骨架点]
@@ -92,9 +101,6 @@ class BasicProcess():
         """        
         return img_binary
 
-    # def binart_cluster(self,img_bgr):
-    #     n_clusters = 3
-    #     return myAggCluster(img_bgr,n_clusters)
 
     def generate_path(self,img_binary, startpoint, endpoint, step=10):
        # img_binary = (img_binary==0).astype(np.uint8)
@@ -136,8 +142,6 @@ class BasicProcess():
                 points (list):          [点坐标序列]     样例 --> [[x0,y0],[x1,y1],[x2,y2]]
         """
         endpoints = endpointDetection(img_binary)
-        # cv2.imshow('binary',img_binary)
-        # cv2.waitKey((1))
         paths_full = skeletonExtraction(img_binary, endpoints)
         paths = []
         for path_joints in paths_full:
@@ -147,14 +151,14 @@ class BasicProcess():
             if (len(path_joints) - 1) % step != 0:
                 joints.append([path_joints[-1][1], path_joints[-1][0]])
             paths.append(joints)
-        return paths
+        return endpoints, paths
 
 
 
 
 
 class MyProcess(BasicProcess):
-    # 吸铁石
+    # ldd
     def magnet(self,point, img_binary, size=12):
         """
         point: the loc of the raw point
@@ -242,3 +246,62 @@ class MyProcess(BasicProcess):
             #     point2 = point2[::-1]
         return point2
 
+
+    def waist(self, joints, img_binary, if_min=True, r=15):
+        n, m = img_binary.shape
+
+        tmp = np.arange(-r, r)[np.newaxis, :]
+        degree = (np.arange(0, 180) / 180. * 2 * np.pi)[:, np.newaxis]
+        dx = np.floor(tmp * np.cos(degree)).astype(np.int32)
+        dx_ = np.ceil(tmp * np.cos(degree)).astype(np.int32)
+        dy = np.floor(tmp * np.sin(degree)).astype(np.int32)
+        dy_ = np.ceil(tmp * np.sin(degree)).astype(np.int32)
+        del tmp
+
+        def calculate_width(binary, x, y):
+            # if (binary[x, y] == 0) or (
+            #         (binary[x - 1, y] & binary[x, y - 1] & binary[x + 1, y] & binary[x, y + 1]) == 1):
+            #     return None
+            try:
+                values = np.max((binary[x + dx, y + dy], binary[x + dx_, y + dy],
+                                 binary[x + dx, y + dy_], binary[x + dx_, y + dy_]), axis=0)
+                w_of_angles = np.zeros(180)
+                for index,value in enumerate(values):
+                    s = 0
+                    found_zero = False
+                    for i in range(len(value)):
+                        if found_zero:      #过中点了
+                            if value[i]==1:
+                                s += 1
+                                if i==29:   # 若此时是最后一个点，直接赋值作为结果
+                                    w_of_angles[index] = s
+                            else:
+                                w_of_angles[index] = s
+                                break
+                        else:
+                            if value[i]==1:
+                                s += 1
+                            else:
+                                s = 0
+                        if i==16:
+                            found_zero = True
+
+                #s = values.sum(axis=1)
+                w = min(w_of_angles)
+                return w
+            except:
+                print('宽度报错啦！')
+                return 0
+
+        shifted = np.zeros((n + 2 * r + 1, m + 2 * r + 1), dtype=np.uint8)
+        shifted[r:r + n, r:r + m] = img_binary
+        waist_array = np.zeros(len(joints))
+        for i in range(0,len(joints)):
+            y = joints[i][0]
+            x = joints[i][1]
+            waist_array[i] = calculate_width(shifted,x+r,y+r)
+        #print(waist_array)
+        waist_median = round(findNearest(waist_array, np.median(waist_array)))
+        # waist_mean = round(findNearest(waist_array, np.mean(waist_array)))
+        # waist_mode = stats.mode(waist_array)[0][0]
+        return waist_median

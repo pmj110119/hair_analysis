@@ -10,7 +10,7 @@ import os
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas    # matplotlib画图用
 import numpy as np
 import json
-from lib.hair import getOrientation,get_PCA_angle,getWarpTile,curve_plot,get_width,auto_search,impaint,getMidPoint
+from lib.hair import getOrientation,get_PCA_angle,getWarpTile,curve_plot,endpoint_plot,auto_search,impaint,getMidPoint
 from pyqtgraph import PlotWidget
 import pyqtgraph as pg
 import glob
@@ -26,6 +26,15 @@ from lib.process import MyProcess
 process = MyProcess()
 
 import matplotlib.pyplot as plt
+
+
+DEBUG = False
+
+
+
+
+
+
 # dict转json时需要用到的转码函数
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -54,8 +63,8 @@ BINARY = 0
 BINARY_NORMAL = 0
 BINARY_AUTO = 1
 BINARY_DL = 2
-BINARY_AUTO_WITH_DL = 3
-BINARY_Cluster = 4
+BINARY_INNER = 3
+
 
 class InpaintThread(QThread):  # 步骤1.创建一个线程实例
     mysignal = pyqtSignal(np.ndarray)  # 创建一个自定义信号，元组参数
@@ -64,10 +73,66 @@ class InpaintThread(QThread):  # 步骤1.创建一个线程实例
         self.result_ = result
         self.img = image
     def run(self):
-
         img_impaint = impaint(self.result_, self.img)
-        print('Inpaint over！！！')
         self.mysignal.emit(img_impaint)  # 发射自定义信号
+
+
+class FullImagePlotThread(QThread):  # 步骤1.创建一个线程实例
+    signal_img = pyqtSignal(np.ndarray)  # 创建一个自定义信号，元组参数
+    def __init__(self):
+        super(FullImagePlotThread, self).__init__()
+    def update(self,result,image,distinguishValue,plot_alpha):
+        self.result = result
+        self.img = image
+        self.distinguishValue = distinguishValue
+        self.plot_alpha = plot_alpha
+    def run(self):
+        while True:
+            img = curve_plot(self.img, self.result, self.distinguishValue, (255, 0, 0),alpha=self.plot_alpha)
+            self.signal_img.emit(img)  # 发射自定义信号
+            self.msleep(1000)
+
+
+class AutoDetectThread(QThread):  # 子线程：全图自动标注
+    mysignal = pyqtSignal(list)
+    mysignal_endpoints = pyqtSignal(list)
+    mysignal_ratio = pyqtSignal(int)
+    def __init__(self,binary):
+        super(AutoDetectThread, self).__init__()
+        self.binary = binary
+        self.STOP = False
+    def stop(self):
+        self.STOP = True
+    def run(self):
+        # 分离连通域
+        self.mysignal_ratio.emit(0)
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(self.binary.astype(np.uint8), connectivity=8)
+        for i in range(1, num_labels):
+            if self.STOP:
+                break
+            temp_result = []
+            x, y, width, height, area = stats[i]
+            mask = (labels == i).astype(np.uint8)[y:(y+height),x:(x+width)]
+            endpoints, hair_pairs = process.autoSkeletonExtraction(mask, step=10)
+            if len(hair_pairs)>0:
+                for joints in hair_pairs:
+                    height = process.waist(joints, mask)
+                    for joint_ in joints:  # 映射回原图坐标系
+                        joint_[0] = joint_[0] + x
+                        joint_[1] = joint_[1] + y
+                    mid = getMidPoint(joints)
+                    temp_result.append({'joints': joints, 'width': height, 'mid': mid})
+
+                self.mysignal.emit(temp_result)  # 发射自定义信号
+                self.mysignal_ratio.emit(int(i/num_labels*100))
+            if DEBUG:
+                for endpoint in endpoints:
+                    endpoint = [endpoint[1], endpoint[0]]
+                    endpoint[0] = endpoint[0] + x
+                    endpoint[1] = endpoint[1] + y
+
+                self. mysignal_endpoints.emit(endpoints)
+        self.mysignal_ratio.emit(100)
 
 
 #图像标记类
@@ -77,24 +142,29 @@ class Mark(QMainWindow):
         uic.loadUi("test.ui",self)
 
 
+
         self.setMenu()
         self.setFixedUI()
-
+        self.fullImagePlotThread = FullImagePlotThread()
         self.roiInf_corrected = None
 
         self.image_origin = None
         self.image_roi = None
         self.img_binary = None
         self.img_impaint = None
+        self.img_plot = None
+        self.qmutex_img_plot = QMutex()
 
         self.binary_normal = None
         self.binary_auto = None
         self.binary_dl = None
-        self.binary_aoto_with_dl = None
+        self.binary_inner = None
 
         self.result=[]
+        self.autoDetectThread = None
 
         self.result_bone=[]
+        self.endpoints = []
         self.handle_bone = False
         self.inner_stack = []
         self.box_width_init = 20
@@ -106,7 +176,7 @@ class Mark(QMainWindow):
         self.magnet_flag = True
 
         self.plot_alpha = 1.0
-
+        self.autoDetectRatio = 100
         # 模式选择标志
         self.show_type = BINARY
         self.binary_type = BINARY_AUTO
@@ -190,7 +260,9 @@ class Mark(QMainWindow):
                       "\n   - 查看二值图，切换二值图方式或调整阈值"
                       "\n   - 方向键手动调整宽度"
                       "\n 5. 单击“拔毛”按钮，已标注的毛发在右上角缩略图中会消失。"
-                      "\n    每完成一部分毛发标注后，通过“拔毛”来检查是否有漏标注",
+                      "\n    每完成一部分毛发标注后，通过“拔毛”来检查是否有漏标注"
+                      "\n\n\n    指导老师：张珏 "
+                      "\n    团队成员：吴钧杰，梁栋栋，陈代超，夏宇，潘铭杰，杨金宇 ",
                     dialog)
         dialog.setGeometry(QRect(500, 500, 500, 400))
         # btn = QPushButton("已导出结果至 result.csv", dialog)
@@ -228,6 +300,8 @@ class Mark(QMainWindow):
         self.radioBinaryNormal.toggled.connect(self.binaryChecked_Normal)
         self.radioBinaryAuto.toggled.connect(self.binaryChecked_Auto)
         self.radioBinaryDL.toggled.connect(self.binaryChecked_DL)
+        self.radioBinaryInner.toggled.connect(self.binaryChecked_Inner)
+
         # self.radioBinaryAutoWithDL.toggled.connect(self.binaryChecked_AutoWithDL)
         # self.radioBinaryCluster.toggled.connect(self.binaryChecked_Cluster)
 
@@ -242,11 +316,18 @@ class Mark(QMainWindow):
      
 
         self.buttonImpaint.clicked.connect(self.buttonImpaintEvent)
-
+        self.buttonAutoDetect.clicked.connect(self.buttonAutoDetectEvent)
 
 
         self.innerClear()
-        # self.my_thread.mysignal.connect(self.zhi)  # 自定义信号连接
+
+
+        self.timer = QTimer()
+        self.timer.start(300)  # 每过300ms，更新一次绘图线程的值
+        self.timer.timeout.connect(self.fullImagePlotThread_update)
+
+    def fullImagePlotThread_update(self):
+        self.fullImagePlotThread.update(self.result, self.image_origin, self.distinguishValue, self.plot_alpha)
 
 
 
@@ -396,8 +477,10 @@ class Mark(QMainWindow):
                 # 鼠标滚轮缩放roi框
                 self.roiInf = [self.roiInf[0], self.roiInf[1], self.roi_window]
                 self.roiUpdate()
-                self.imshow()
+                x0, x1, y0, y1 = self.roiInf_corrected
+                self.setImg2Label(self.img_plot[y0:y1, x0:x1], self.getBinary()[y0:y1, x0:x1])
                 self.imshow_small_picture()
+
 
 
             if event.type()==QEvent.MouseButtonPress:
@@ -410,8 +493,12 @@ class Mark(QMainWindow):
                 [x, y] = [event.pos().x(), event.pos().y()]
                 self.roiInf = [x / self.roi_size[0], y / self.roi_size[1], self.roi_window]
                 self.roiUpdate()
-                self.imshow()
+                x0, x1, y0, y1 = self.roiInf_corrected
+                self.setImg2Label(self.img_plot[y0:y1, x0:x1], self.getBinary()[y0:y1, x0:x1])
                 self.imshow_small_picture()
+
+
+
 
 
         return QMainWindow.eventFilter(self, source, event)
@@ -431,27 +518,6 @@ class Mark(QMainWindow):
 
 
 
-    # 得专门用一个线程去对整张图进行运算，如果运算完成，则缩略图直接用就行，不需要再进行curve_plot
-    def imshowPure(self):   # 权宜之计，之后进一步优化   绘图只在当前窗口上画，然后替换掉原图对应区域————这个已完成，但带来新的问题：缩略图会卡，优化方法见上行
-        if self.roiInf_corrected is not None:
-            x0, x1, y0, y1 = self.roiInf_corrected
-            img = self.label_img[y0:y1, x0:x1, :]
-
-        # 绘制左图
-        img = cv.resize(self.label_img, self.img_size)
-        qimg = QtGui.QImage(img, img.shape[1], img.shape[0],
-                    img.shape[1]*3, QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
-        self.labelImg.setPixmap(QtGui.QPixmap(qimg))
-        # 绘制右图
-        curve = cv.resize(self.getBinary()[y0:y1, x0:x1], self.img_size)
-        qimg = QtGui.QImage(curve, curve.shape[1], curve.shape[0],
-                    curve.shape[1]*3, QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
-        self.labelImg_curve.setPixmap(QtGui.QPixmap(qimg))
-
-
-
-
-
 
 
 
@@ -463,21 +529,12 @@ class Mark(QMainWindow):
 
             [x,y] = self.result[self.handle_index]['joints'][-1]      # 获取最后一个点
 
-            if self.roiInf_corrected is not None:
-                x0, x1, y0, y1 = self.roiInf_corrected
 
-                    # [x, y] = [int(x0 + x * self.roi_window / self.labelImg.width()),
-                    #          int(y0 + y * self.roi_window / self.labelImg.width())]
+            x0, x1, y0, y1 = self.roiInf_corrected
+            x = round(x - x0)
+            y = round(y - y0)
 
-                x = round(x - x0)
-                y = round(y - y0)
-
-            temp_img = cv.line(self.label_img.copy(), (x, y), (mousePoint[0], mousePoint[1]), (100, 255, 100), 2, cv.LINE_4)       # 直接用opencv绘制细线
-
-            # temp = curve_plot(self.label_img,[self.result[self.handle_index]], 0,(0, 255, 0),(0, 255, 0),alpha=alpha,handle_diff=[self.roiInf_corrected[0],self.roiInf_corrected[2]])   # 仅对选中的一根毛发进行绘制
-            # self.label_img = temp['img']
-
-
+            temp_img = cv.line(self.img_plot[y0:y1,x0:x1].copy(), (x, y), (mousePoint[0], mousePoint[1]), (100, 255, 100), 2, cv.LINE_4)       # 直接用opencv绘制细线
 
             img = cv.resize(temp_img, self.img_size)
             qimg = QtGui.QImage(img, img.shape[1], img.shape[0],
@@ -485,25 +542,49 @@ class Mark(QMainWindow):
             self.labelImg.setPixmap(QtGui.QPixmap(qimg))
 
 
+    def imshowSingleUpdate(self,single_result):
+        x0, x1, y0, y1 = [0,9999,0,9999]
+        for result_ in single_result:
+            joints = result_['joints']
+            for x,y in joints:
+                if x < x0:
+                    x0 = x
+                elif x > x1:
+                    x1 = x
+                if y < y0:
+                    y0 = y
+                elif y>y1:
+                    y1 = y
+        label_img = curve_plot(self.img_plot, single_result, self.distinguishValue/self.downsample_ratio,(255, 0, 0),alpha=self.plot_alpha, roi=[x0, x1, y0, y1])
+        self.img_plot[y0:y1, x0:x1] = label_img
+        [x0, x1, y0, y1] = self.roiInf_corrected
 
+
+
+        if len(self.result) > 0 and self.handle_index != -2:
+
+            label_img = curve_plot(self.img_plot[y0:y1, x0:x1], [self.result[self.handle_index]], 0, (0, 255, 0), (0, 255, 0),
+                                        alpha=self.plot_alpha, handle_diff=[self.roiInf_corrected[0],
+                                                                            self.roiInf_corrected[2]])  # 仅对选中的一根毛发进行绘制
+            curve = self.getBinary()[y0:y1, x0:x1]  # 得到二值图ROI
+            curve = curve_plot(curve, [self.result[self.handle_index]], 0, (0, 255, 0), (0, 255, 0),
+                               alpha=1, handle_diff=[self.roiInf_corrected[0], self.roiInf_corrected[2]],
+                               handle_width=2)  # 对二值图进行绘制
+
+            self.setImg2Label(label_img, curve)
+
+        else:
+            self.setImg2Label(self.img_plot[y0:y1, x0:x1])
 
 
 
 
     def imshow(self,update=False,plot=True, inner_handle=True):
         self.label_img = self.getImage(update).copy()
-
-
+        x0, x1, y0, y1 = self.roiInf_corrected
         if inner_handle:
             for [x_min,x_max,y_min,y_max],inner_binary in self.inner_stack:
-                # if self.roiInf_corrected is not None:
-                #     x0, x1, y0, y1 = self.roiInf_corrected
-                #     x_min -= x0
-                #     x_max -= x0
-                #     y_min -= y0
-                #     y_max -= y0
                 roi_img = self.label_img[y_min:y_max, x_min:x_max]
-
                 try:
                     fg = cv.bitwise_and(roi_img, roi_img, mask=inner_binary)
                 except:
@@ -514,71 +595,65 @@ class Mark(QMainWindow):
                 new_fg = new_fg + bg
                 self.label_img[y_min:y_max, x_min:x_max] = new_fg
 
+        # 绘制标注图上所有毛发
+        self.label_img = curve_plot(self.label_img, self.result, self.distinguishValue/self.downsample_ratio,(255, 0, 0),alpha=self.plot_alpha, roi=self.roiInf_corrected)
+       # self.qmutex_img_plot.lock()
+        self.img_plot[y0:y1, x0:x1] = self.label_img
+        #self.qmutex_img_plot.unlock()
+        if DEBUG:
+            self.plotEndpoints(self.endpoints)
 
-        temp = curve_plot(self.label_img, self.result, self.distinguishValue/self.downsample_ratio,(255, 0, 0),alpha=self.plot_alpha, roi=self.roiInf_corrected)
-
-        if self.isPlot==True:
-            self.label_img = temp['img']   # 用plot后的图
-        else:
-            if len(self.label_img.shape)==2:
-                self.label_img = cv.cvtColor(self.label_img, cv.COLOR_GRAY2BGR)
-
-        if self.roiInf_corrected is not None:
-            x0, x1, y0, y1 = self.roiInf_corrected
-            # img = self.label_img[y0:y1, x0:x1, :]
-
-
-        # 将常规绘图与handle_index绘图分开进行，重复调用一次curve_plot
         curve = self.getBinary()[y0:y1, x0:x1]  # 得到二值图ROI
         if len(self.result)>0 and self.handle_index!=-2:
-            if self.handle_bone==True:
-                alpha=1     # 未标完的毛发，始终呈不透明显示（可能透明化反而好点，存疑）
-            else:
-                alpha=self.plot_alpha
-            temp = curve_plot(self.label_img,[self.result[self.handle_index]], 0,(0, 255, 0),(0, 255, 0),alpha=alpha,handle_diff=[self.roiInf_corrected[0],self.roiInf_corrected[2]])   # 仅对选中的一根毛发进行绘制
-            self.label_img = temp['img']
-            binary_temp = curve_plot(curve, [self.result[self.handle_index]], 0, (0, 255, 0), (0, 255, 0),
+            self.label_img = curve_plot(self.label_img,[self.result[self.handle_index]], 0,(0, 255, 0),(0, 255, 0),alpha=self.plot_alpha,handle_diff=[self.roiInf_corrected[0],self.roiInf_corrected[2]])   # 仅对选中的一根毛发进行绘制
+            curve = curve_plot(curve, [self.result[self.handle_index]], 0, (0, 255, 0), (0, 255, 0),
                               alpha=1, handle_diff=[self.roiInf_corrected[0], self.roiInf_corrected[2]], handle_width=2)        # 对二值图进行绘制
-            curve = binary_temp['img']
+
+        self.setImg2Label(self.label_img,curve)
 
 
-
-        img = cv.resize(self.label_img, self.img_size)
+    def setImg2Label(self,image,curve=None):
+        # 绘制标注图
+        img = cv.resize(image, self.img_size)
         qimg = QtGui.QImage(img, img.shape[1], img.shape[0],
-                    img.shape[1]*3, QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
+                            img.shape[1] * 3, QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
         self.labelImg.setPixmap(QtGui.QPixmap(qimg))
-        # 绘制右图
-        curve = cv.resize(curve, self.img_size)
-        if len(curve.shape)==2:
-            qimg = QtGui.QImage(curve, curve.shape[1], curve.shape[0],
-                        curve.shape[1]*1, QtGui.QImage.Format_Grayscale8)  # bytesPerLine参数设置为image的width*image.channels
-        else:
-            qimg = QtGui.QImage(curve, curve.shape[1], curve.shape[0],
-                                curve.shape[1] * 3,
-                                QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
-        self.labelImg_curve.setPixmap(QtGui.QPixmap(qimg))
+
+        if curve is not None:
+            # 绘制二值图
+            curve = cv.resize(curve, self.img_size)
+            if len(curve.shape) == 2:
+                qimg = QtGui.QImage(curve, curve.shape[1], curve.shape[0],
+                                    curve.shape[1] * 1,
+                                    QtGui.QImage.Format_Grayscale8)  # bytesPerLine参数设置为image的width*image.channels
+            else:
+                qimg = QtGui.QImage(curve, curve.shape[1], curve.shape[0],
+                                    curve.shape[1] * 3,
+                                    QtGui.QImage.Format_RGB888)  # bytesPerLine参数设置为image的width*image.channels
+            self.labelImg_curve.setPixmap(QtGui.QPixmap(qimg))
 
 
+    def updateAll(self):
+        self.imshow()
+        self.updateAnalysis()
+        self.saveJson()
 
 
+    def updateAnalysis(self):
         # 绘制统计信息图
-        self.width_count = np.zeros(30,dtype=np.uint16)
+        self.width_count = np.zeros(30, dtype=np.uint16)
         for result_ in self.result:
             width = result_['width']
-            if(width>30):   # 暂时认为不存在超过30宽度的毛发，后面改成自适应数组
+            if (width > 30):  # 暂时认为不存在超过30宽度的毛发，后面改成自适应数组
                 continue
             self.width_count[int(width)] += 1
-
-
-
-
         inf = analysisInf(self.width_count[:self.distinguishValue])
         self.statusNum.setText(inf['num'])
         self.statusMedian.setText(inf['median'])
         self.statusMean.setText(inf['mean'])
         self.statusStd.setText(inf['std'])
         self.statusMode.setText(inf['mode'])
-        inf = analysisInf(self.width_count[self.distinguishValue:],offset=self.distinguishValue)
+        inf = analysisInf(self.width_count[self.distinguishValue:], offset=self.distinguishValue)
         self.statusNum_2.setText(inf['num'])
         self.statusMedian_2.setText(inf['median'])
         self.statusMean_2.setText(inf['mean'])
@@ -587,18 +662,17 @@ class Mark(QMainWindow):
 
         # 显示直方图
         self.plot_widget.clear()
-        bg1 = pg.BarGraphItem(x=self.x[:self.distinguishValue], height=self.width_count[:self.distinguishValue], width=1.2, brush=pg.mkBrush(color=(200, 0, 0)))
-        bg2 = pg.BarGraphItem(x=self.x[self.distinguishValue:], height=self.width_count[self.distinguishValue:], width=1.2, brush=pg.mkBrush(color=(0, 0, 255)))
+        bg1 = pg.BarGraphItem(x=self.x[:self.distinguishValue], height=self.width_count[:self.distinguishValue],
+                              width=1.2, brush=pg.mkBrush(color=(200, 0, 0)))
+        bg2 = pg.BarGraphItem(x=self.x[self.distinguishValue:], height=self.width_count[self.distinguishValue:],
+                              width=1.2, brush=pg.mkBrush(color=(0, 0, 255)))
         self.plot_widget.addItem(bg1)
         self.plot_widget.addItem(bg2)
 
-
-
+    def saveJson(self):
         json_str = json.dumps(self.result, indent=4, cls=NpEncoder)
         with open(self.tmp + '.json', 'w') as json_file:
             json_file.write(json_str)
-
-
 
     def magnetChecked(self, isChecked):
         if (isChecked == 0):
@@ -628,6 +702,12 @@ class Mark(QMainWindow):
             self.binary_type = BINARY_DL
             self.getBinary(True)
         self.imshow()
+    def binaryChecked_Inner(self,isChecked) :
+        if isChecked:
+            self.binary_type = BINARY_INNER
+            self.getBinary(True)
+        self.imshow()
+
     # def binaryChecked_AutoWithDL(self,isChecked) :
     #     if isChecked:
     #         self.binary_type = BINARY_AUTO_WITH_DL
@@ -712,7 +792,15 @@ class Mark(QMainWindow):
                                 (int(self.binary_dl.shape[1] / self.downsample_ratio), int(self.binary_dl.shape[0] / self.downsample_ratio)))
                 self.binary_dl = closeopration(self.binary_dl,ksize=self.binary_close)
             return self.binary_dl
-
+        elif self.binary_type==BINARY_INNER:
+            if update:
+                img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.inner.png'
+                inner_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
+                _, self.inner_output = cv.threshold(inner_output, 50, 255, cv.THRESH_BINARY)
+                self.inner_output = cv.resize(self.inner_output,
+                                (int(self.inner_output.shape[1] / self.downsample_ratio), int(self.inner_output.shape[0] / self.downsample_ratio)))
+                self.inner_output = closeopration(self.inner_output,ksize=self.binary_close)
+            return self.inner_output
         # elif self.binary_type==BINARY_AUTO_WITH_DL:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
         #     if update:
         #         img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
@@ -817,13 +905,11 @@ class Mark(QMainWindow):
     def distinguishUpdate(self,value):
         self.distinguishValue = int(value)
         self.spinBoxDistinguish.setValue(int(value))
-        self.imshow()
+        self.updateAll()
 
     def thresholdBinaryNormalUpdate(self,value):
         self.binary_threshold_normal = int(value)
         self.editThreshold.setText(str(value))
-
-
         self.imshow(update=True)
 
     def thresholdBinaryAutoUpdate(self,value):
@@ -837,23 +923,56 @@ class Mark(QMainWindow):
         self.editClose.setText(str(value))
         self.imshow(update=True)
 
+
+    # 子线程1：拔毛
     def buttonImpaintEvent(self):
-        print('拔毛函数')
-        self.lineEditInpaint.setText('拔毛中...')
+        self.log('拔毛中...')
         self.inpaintThread = InpaintThread(self.result, self.image_origin.copy())  # 步骤2. 主线程连接子线
         self.inpaintThread.mysignal.connect(self.buttonImpaintEventSignal)
         self.inpaintThread.start()  # 步骤3 子线程开始执行run函数
-        
-        # self.img_impaint = impaint(self.result, self.image_origin.copy())
-        # self.imshow_small_picture()
-
     def buttonImpaintEventSignal(self,img_inpaint):
         self.img_impaint = img_inpaint
         self.imshow_small_picture()
-        self.lineEditInpaint.setText('拔毛完成')
-        
-        # cv.imshow('aaa',img_inpaint)
-        # cv.waitKey(0)
+        self.log('拔毛完成!')
+
+
+    def log(self,text):
+        self.logBrowser.append(time.strftime("[%H:%M:%S]  "+text,time.localtime()))
+        #self.logBrowser.append()
+        self.logBrowser.ensureCursorVisible()
+
+    # 子线程2：全图自动标注
+    def buttonAutoDetectEvent(self):
+        self.log('全图自动标注中...')
+        self.autoDetectThread = AutoDetectThread(self.getBinary()/255)
+        self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
+        self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
+        self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
+
+        self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
+
+
+    def autoDetectEventSignal(self,temp_result):
+        self.result = temp_result + self.result #次序不能倒，否则影响handle_index
+        if self.handle_index >=0:
+            self.handle_index += len(temp_result)
+        self.imshowSingleUpdate(temp_result)
+        self.updateAnalysis()
+        self.saveJson()
+    def autoDetectRatioEventSignal(self, ratio):
+        self.autoDetectRatio = ratio
+        self.autoDetectBar.setValue(ratio)
+        if ratio==100:
+            self.log('自动标注完成!')
+
+    def autoDetectEndpointEventSignal(self,endpoints):
+        self.endpoints = endpoints
+        self.plotEndpoints(endpoints)
+
+    def plotEndpoints(self,endpoints):
+        self.img_plot = endpoint_plot(self.img_plot, endpoints, (255, 0, 0),alpha=self.plot_alpha)
+
+
 
     def showMatplotlibBar(self):
         # matplotlib绘制更好看的柱状图。。。。
@@ -900,13 +1019,22 @@ class Mark(QMainWindow):
         self.roiInf_corrected = [x0,x1,y0,y1]
 
 
-
-
+    def fullImagePlotStart(self):
+        self.fullImagePlotThread.update(self.result,self.image_origin,self.distinguishValue,self.plot_alpha)
+        self.fullImagePlotThread.signal_img.connect(self.fullImagePlotEventSignal)
+        self.fullImagePlotThread.start()
+    def fullImagePlotEventSignal(self,img):
+        self.img_plot = img
 
     # 列表图片选取
     def itemClick(self):  #列表框单击事件
         self.handle_index = -2
-
+        self.innerClear()
+        if self.autoDetectThread is not None:
+            self.autoDetectThread.stop()
+            if self.autoDetectRatio!=100:
+                self.log('自动标注中止')
+        self.endpoints = []
         # self.distinguishValue = 0   # 二分类宽度阈值
 
 
@@ -936,6 +1064,7 @@ class Mark(QMainWindow):
 
 
         self.image_origin = src.copy()
+        self.img_plot = src.copy()
         # 怎么在修改分辨率时不重新加载？？
         self.img_impaint = src.copy()
 
@@ -959,9 +1088,11 @@ class Mark(QMainWindow):
         self.getBinary(update=True)
 
 
-        self.imshow()
+        self.updateAll()
 
-
+        self.img_plot = curve_plot(self.image_origin, self.result, self.distinguishValue / self.downsample_ratio,
+                                    (255, 0, 0), alpha=self.plot_alpha)
+        self.fullImagePlotStart()
 
     def checkThisHair(self):
         if self.handle_bone == True:
@@ -972,7 +1103,7 @@ class Mark(QMainWindow):
                 joint_temp = self.result_bone[-1]
 
                 joint_temp = process.border(joint_temp,self.getBinary())
-                height = process.waist(joint_temp,self.getBinary())
+                height = process.waist(joint_temp,self.getBinary()/255)
 
                 mid = getMidPoint(self.result_bone[-1])
                 self.result.append({'joints': self.result_bone[-1], 'width': height, 'mid': mid})
@@ -1018,7 +1149,7 @@ class Mark(QMainWindow):
                 self.result.pop(-1)
 
 
-                height = process.waist(joints,self.getBinary())
+                height = process.waist(joints,self.getBinary()/255)
                 mid = getMidPoint(joints)
 
                 self.result.append({'joints': joints, 'width': height, 'mid': mid})
@@ -1031,19 +1162,14 @@ class Mark(QMainWindow):
     def keyPressEvent(self, QKeyEvent):
         if self.img_loaded==False:
             return
-
-
- 
-
-
         # 确认
         if QKeyEvent.key() == Qt.Key_E:
             self.checkThisHair()
-            self.imshow()
+            self.updateAll()
             return
         elif QKeyEvent.key() == Qt.Key_Q:
             self.generateHairPath()
-            self.imshow()
+            self.updateAll()
             return
         elif QKeyEvent.key() == Qt.Key_I:
             if len(self.inner_stack)<=0:
@@ -1063,7 +1189,7 @@ class Mark(QMainWindow):
             inner_binary_merged = (inner_binary_merged>0).astype(np.uint8)
 
 
-            hair_pairs = process.autoSkeletonExtraction(inner_binary_merged)
+            _, hair_pairs = process.autoSkeletonExtraction(inner_binary_merged)
 
             temp_result = []
             for joints in hair_pairs:
@@ -1076,9 +1202,8 @@ class Mark(QMainWindow):
             self.result += temp_result
 
             self.inner_stack = []
-            self.imshow()
-            # cv.imshow('zzz',inner_binary_merged)
-            # cv.waitKey(0)
+            self.updateAll()
+
 
             return
         elif QKeyEvent.key() == Qt.Key_O:
@@ -1099,7 +1224,7 @@ class Mark(QMainWindow):
                 self.handle_index = -2
             else:
                 self.handle_index = -1
-            self.imshow()
+            self.updateAll()
 
         if (len(self.result) < 1):
             return
@@ -1111,7 +1236,7 @@ class Mark(QMainWindow):
         #rect=self.result[self.handle_index]['rect']
        # [[x,y],[w,h],angle] = rect
 
-        begin = time.time()
+
         if QKeyEvent.key() == Qt.Key_A:  # 左移
             for joint in joints:
                 joint[0] -= 1
@@ -1160,45 +1285,16 @@ class Mark(QMainWindow):
             self.result.pop(self.handle_index)
             self.result.append({'joints':joints, 'width':width,'mid':mid})
             self.handle_index = -1  
-            self.imshow()
+            self.updateAll()
 
         elif QKeyEvent.key()== Qt.Key_Down:   # 变窄
             width -= 1
             self.result.pop(self.handle_index)
             self.result.append({'joints':joints,  'width':width,'mid':mid})
             self.handle_index = -1  
-            self.imshow()
+            self.updateAll()
 
 
-
-        if len(joints)==2:
-            pass
-            # if QKeyEvent.key()== Qt.Key_Left:   # 逆时针旋转
-            #     angle -= 2
-            #     rect = ((x,y),(w,h),angle)
-            #     box = cv.boxPoints(rect)
-            #     box = np.int0(box)
-            #     self.result.pop(self.handle_index)
-            #     self.result.append({'type':type, 'joints':joints, 'rect':None, 'box':None, 'width':width})
-            #     self.handle_index = -1
-            #     self.imshow()
-            #
-            # if QKeyEvent.key()== Qt.Key_Right:  # 顺时针旋转
-            #     angle += 2
-            #     rect = ((x,y),(w,h),angle)
-            #     box = cv.boxPoints(rect)
-            #     box = np.int0(box)
-            #     self.result.pop(self.handle_index)
-            #     self.result.append({'type':type, 'joints':joints,'rect':rect, 'box':box, 'width':rect[1][1]})
-            #     self.handle_index = -1
-            #     self.imshow()
-
-
-
-
-
-        if QKeyEvent.modifiers() == Qt.ControlModifier|Qt.ShiftModifier and QKeyEvent.key() == Qt.Key_A:  # 三键组合
-            print('按下了Ctrl+Shift+A键')
 
 
     def listModift(self,joints):

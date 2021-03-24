@@ -79,7 +79,8 @@ def _merge_endpoint(binary, candidate, r):
     
     for x, y in candidate:
         if (isinstance(ufs.fa[(x, y)], int)):
-            ans[(x, y)] //= -ufs.fa[(x, y)]
+            res = (ans[(x, y)] / -ufs.fa[(x, y)])
+            ans[(x, y)] = (round(res[0]), round(res[1]))
     
     return np.array(list(ans.values()))
 
@@ -109,7 +110,6 @@ def find_endpoint(binary, r = 10, degree_thres = 60):
     del tmp
     
     def _is_endpoint(binary, x, y):
-        
         if (binary[x, y] == 0) or ((binary[x-1, y] & binary[x, y-1] & binary[x+1, y] & binary[x, y+1]) == 1):
             return None
 
@@ -133,7 +133,7 @@ def find_endpoint(binary, r = 10, degree_thres = 60):
             if (angle is not None):
                 candidates[(i - r, j - r)] = angle
     
-    return _merge_endpoint(binary, candidates, r)
+    return _merge_endpoint(binary, candidates, 10)
 
 def endpointDetection(img_binary):
     """
@@ -143,7 +143,7 @@ def endpointDetection(img_binary):
         Returns:
             points (ndarray) : 所有检测到的端点
     """
-    return find_endpoint(img_binary, r = 10, degree_thres = 90)
+    return find_endpoint(img_binary, r = 15, degree_thres = 60)
 
 if (__name__ == "__main__"):
     

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from math import *
 from PIL import Image,ImageDraw
 import scipy as sp
+import glob
 from scipy.interpolate import splprep  # 增加该行
 def getOrientation(pts):
     sz = len(pts)
@@ -374,9 +375,7 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
     img_color = Image.fromarray(img)
     draw_img = ImageDraw.Draw(img_color)  # 实例化一个ImageDraw
 
-   # curve = np.zeros((img.shape[0],img.shape[1],img.shape[2]),dtype=np.uint8)
-   # curve = Image.fromarray(curve)
-   # draw_curve = ImageDraw.Draw(curve)  # 实例化一个对象
+
     for result in results:
         joint = result['joints']
         if len(joint)<2:
@@ -386,7 +385,6 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
             width = handle_width
         mid_point = result['mid']
         joint_fit = fitCurve(joint)    # 暂时关闭曲线拟合功能
-        #joint_fit = joint
         if width>=distinguishValue:
             color=color2
         else:
@@ -422,8 +420,42 @@ def curve_plot(img,results,distinguishValue=0,color1=(0, 200, 150),color2=(0, 10
     if len(img_color.shape) == 2:
         img_color = cv2.cvtColor(img_color, cv2.COLOR_GRAY2BGR)
     overlapping = cv2.addWeighted(img_color, alpha, src, 1-alpha, 0)
-    return {'img':overlapping}
+    return overlapping
 
+def endpoint_plot(img,endpoints,color1=(0, 200, 150),alpha=1,roi=None):
+    if roi is not None:
+        x0, x1, y0, y1 = roi
+        img = img[y0:y1, x0:x1]
+    else:
+        x0,y0=[0,0]
+
+    if len(img.shape)==2:
+        img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
+    src = img.copy()
+
+
+    img_color = Image.fromarray(img)
+    draw_img = ImageDraw.Draw(img_color)  # 实例化一个ImageDraw
+
+    radius = 3
+    for endpoint in endpoints:
+        print(endpoints)
+        # 画中点
+        draw_img.ellipse((endpoint[0] - radius-x0, endpoint[1] - radius-y0, endpoint[0] + radius-x0, endpoint[1] + radius-y0), fill=color1, outline=(0, 0, 0))
+
+
+
+    img_color = np.array(img_color).astype(np.uint8)    # PIL转回numpy
+
+
+    if len(img_color.shape) == 2:
+        img_color = cv2.cvtColor(img_color, cv2.COLOR_GRAY2BGR)
+    overlapping = cv2.addWeighted(img_color, alpha, src, 1-alpha, 0)
+    return overlapping
+
+
+def saveDataset(path):
+    labels = glob.glob('*.json')
 
 
 
