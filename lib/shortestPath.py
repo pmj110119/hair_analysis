@@ -13,7 +13,7 @@ import heapq
 from numba import jit
 
 @jit(nopython = True)
-def dijkstra(Img, D, Start, Endlist):
+def dijkstra(Img, D, Start, Endlist, single_hair_mode = True):
     
     rows, cols = D.shape[:2]
     stx, sty = Start
@@ -51,7 +51,7 @@ def dijkstra(Img, D, Start, Endlist):
             connected_target += 1
 
             ####### alpha版本：连通域中只能有两个端点
-            if (connected_target > 1):
+            if (single_hair_mode) and (connected_target > 1):
                 ###### 找过的路径全部作废
                 dist = np.ones((rows, cols)) * np.inf
                 lastx = np.ones((rows, cols), dtype = np.int32) * (-1)

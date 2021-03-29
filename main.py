@@ -135,11 +135,17 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
         self.mysignal_ratio.emit(100)
 
 
+class BinaryWindow(QMainWindow):
+    def __init__(self):
+        super(BinaryWindow, self).__init__()
+        uic.loadUi("binary.ui", self)
+
 #图像标记类
 class Mark(QMainWindow):
     def __init__(self):
         super(Mark, self).__init__()
         uic.loadUi("test.ui",self)
+
 
 
 
@@ -179,7 +185,7 @@ class Mark(QMainWindow):
         self.autoDetectRatio = 100
         # 模式选择标志
         self.show_type = BINARY
-        self.binary_type = BINARY_AUTO
+        self.binary_type = BINARY_INNER
         self.downsample_ratio = 1
         # 序号
         self.handle_index=-1
@@ -215,7 +221,11 @@ class Mark(QMainWindow):
 
         self.menu = self.menubar.addMenu("菜单")
 
-
+        # 二值化调整
+        self.binaryMenu = QAction("二值图调整", self)
+        self.binaryMenu.setShortcut("Ctrl+b")  # 设置快捷键
+        self.binaryMenu.triggered.connect(self.showBinaryMenu)
+        self.menu.addAction(self.binaryMenu)
         # 调整分辨率
         self.resolution = self.menu.addMenu("分辨率调整")
         resolution70Action = QAction('70%', self)
@@ -241,11 +251,31 @@ class Mark(QMainWindow):
         self.exportCSV.triggered.connect(self.buttonSaveEvent)
         self.menu.addAction(self.exportCSV)
         #self.file.triggered[QAction].connect(self.processtrigger)
+        # 导出二值图
+        self.binarySave = QAction("导出二值图", self)
+        self.binarySave.setShortcut("Ctrl+a")  # 设置快捷键
+        self.binarySave.triggered.connect(self.saveBinary)
+        self.menu.addAction(self.binarySave)
         # 帮助
         self.help = QAction("帮助", self)
         self.help.setShortcut("Ctrl+h")  # 设置快捷键
         self.help.triggered.connect(self.showHelpDialog)
         self.menu.addAction(self.help)
+
+    def showBinaryMenu(self):
+        self.binaryWindow = BinaryWindow()
+        self.binaryWindow.show()
+        # 二值化方法滑块
+        self.binaryWindow.sliderBinaryNormal.valueChanged.connect(self.thresholdBinaryNormalUpdate)
+        self.binaryWindow.sliderBinaryAuto.valueChanged.connect(self.thresholdBinaryAutoUpdate)
+        # 二值化方法
+        self.binaryWindow.radioBinaryNormal.toggled.connect(self.binaryChecked_Normal)
+        self.binaryWindow.radioBinaryAuto.toggled.connect(self.binaryChecked_Auto)
+        self.binaryWindow.radioBinaryDL.toggled.connect(self.binaryChecked_DL)
+        self.binaryWindow.radioBinaryInner.toggled.connect(self.binaryChecked_Inner)
+        # 闭运算
+        self.binaryWindow.sliderBinaryClose.valueChanged.connect(self.binaryCloseUpdate)
+
     def showHelpDialog(self):
         dialog = QDialog()
         word = QLabel("------------------------帮助页面----------------------------------\n"
@@ -273,12 +303,18 @@ class Mark(QMainWindow):
 
 
 
+    def saveBinary(self):
+        binary = curve_plot(np.zeros_like(self.getBinary()), self.result, 0, (255, 255, 255), (255, 255, 255), alpha=1)  # 对二值图进行绘制
+        print('data/temp/'+os.path.basename(self.tmp)+'.png')
+        cv.imwrite('data/temp/'+os.path.basename(self.tmp).split('.')[0]+'.png',binary)
+
+
     def initUI(self):
 
         # 值的初始化
-        self.binary_threshold_normal = self.sliderBinaryNormal.value()
-        self.binary_threshold_auto = self.sliderBinaryAuto.value()
-        self.binary_close = self.sliderBinaryClose.value()
+        self.binary_threshold_normal = 140
+        self.binary_threshold_auto = 5
+        self.binary_close = 3
         # 加载所有图片名并添加到列表中
         allImgs = glob.glob(imgPath+'*.jpg')
 
@@ -286,21 +322,8 @@ class Mark(QMainWindow):
         for imgTmp in allImgs:
             self.allFiles.addItem(os.path.basename(imgTmp))   # 将此文件添加到列表中
         self.allFiles.itemClicked.connect(self.itemClick)   #列表框关联时间，用信号槽的写法方式不起作用
- 
-        # 回调函数
+
         self.sliderDistinguish.valueChanged.connect(self.distinguishUpdate)
-
-        self.sliderBinaryNormal.valueChanged.connect(self.thresholdBinaryNormalUpdate)
-        self.sliderBinaryAuto.valueChanged.connect(self.thresholdBinaryAutoUpdate)
-
-        self.sliderBinaryClose.valueChanged.connect(self.binaryCloseUpdate)
-
-
-
-        self.radioBinaryNormal.toggled.connect(self.binaryChecked_Normal)
-        self.radioBinaryAuto.toggled.connect(self.binaryChecked_Auto)
-        self.radioBinaryDL.toggled.connect(self.binaryChecked_DL)
-        self.radioBinaryInner.toggled.connect(self.binaryChecked_Inner)
 
         # self.radioBinaryAutoWithDL.toggled.connect(self.binaryChecked_AutoWithDL)
         # self.radioBinaryCluster.toggled.connect(self.binaryChecked_Cluster)
@@ -769,38 +792,48 @@ class Mark(QMainWindow):
             binary = cv.morphologyEx(binary, cv.MORPH_CLOSE, kernel)
             return binary
 
-        if self.binary_type==BINARY_NORMAL:
-            if update:
-                img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
-                _, self.img_binary = cv.threshold(img_gray, self.binary_threshold_normal, 255, cv.THRESH_BINARY_INV)
-                self.img_binary = closeopration(self.img_binary,ksize=self.binary_close)
-            return self.img_binary
+        try:
+            if self.binary_type==BINARY_NORMAL:
+                if update:
+                    img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
+                    _, self.img_binary = cv.threshold(img_gray, self.binary_threshold_normal, 255, cv.THRESH_BINARY_INV)
+                    self.img_binary = closeopration(self.img_binary,ksize=self.binary_close)
+                return self.img_binary
 
-        elif self.binary_type==BINARY_AUTO:
-            if update:
-                img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
-                self.binary_auto = cv.adaptiveThreshold(img_gray, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,int(11/self.downsample_ratio),self.binary_threshold_auto)
-                self.binary_auto = closeopration(self.binary_auto,ksize=self.binary_close)
+            elif self.binary_type==BINARY_AUTO:
+                if update:
+                    img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
+                    self.binary_auto = cv.adaptiveThreshold(img_gray, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,int(11/self.downsample_ratio),self.binary_threshold_auto)
+                    self.binary_auto = closeopration(self.binary_auto,ksize=self.binary_close)
+                return self.binary_auto
+
+            elif self.binary_type==BINARY_DL:
+                if update:
+                    img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
+                    dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
+                    _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
+                    self.binary_dl = cv.resize(self.binary_dl,
+                                    (int(self.binary_dl.shape[1] / self.downsample_ratio), int(self.binary_dl.shape[0] / self.downsample_ratio)))
+                    self.binary_dl = closeopration(self.binary_dl,ksize=self.binary_close)
+                return self.binary_dl
+            elif self.binary_type==BINARY_INNER:
+                if update:
+                    img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.inner.png'
+                    inner_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
+                    _, self.inner_output = cv.threshold(inner_output, 50, 255, cv.THRESH_BINARY)
+                    self.inner_output = cv.resize(self.inner_output,
+                                    (int(self.inner_output.shape[1] / self.downsample_ratio), int(self.inner_output.shape[0] / self.downsample_ratio)))
+                    self.inner_output = closeopration(self.inner_output,ksize=self.binary_close)
+                return self.inner_output
+        except:
+            # msg_box = QMessageBox(QMessageBox.Warning, '错误', '二值图加载失败，请检查是否有文件缺失')
+            # msg_box.exec_()
+            self.binary_type == BINARY_AUTO
+            img_gray = cv.cvtColor(self.image_origin, cv.COLOR_BGR2GRAY)
+            self.binary_auto = cv.adaptiveThreshold(img_gray, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,
+                                                    int(11 / self.downsample_ratio), self.binary_threshold_auto)
+            self.binary_auto = closeopration(self.binary_auto, ksize=self.binary_close)
             return self.binary_auto
-
-        elif self.binary_type==BINARY_DL:
-            if update:
-                img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
-                dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
-                _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
-                self.binary_dl = cv.resize(self.binary_dl,
-                                (int(self.binary_dl.shape[1] / self.downsample_ratio), int(self.binary_dl.shape[0] / self.downsample_ratio)))
-                self.binary_dl = closeopration(self.binary_dl,ksize=self.binary_close)
-            return self.binary_dl
-        elif self.binary_type==BINARY_INNER:
-            if update:
-                img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.inner.png'
-                inner_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
-                _, self.inner_output = cv.threshold(inner_output, 50, 255, cv.THRESH_BINARY)
-                self.inner_output = cv.resize(self.inner_output,
-                                (int(self.inner_output.shape[1] / self.downsample_ratio), int(self.inner_output.shape[0] / self.downsample_ratio)))
-                self.inner_output = closeopration(self.inner_output,ksize=self.binary_close)
-            return self.inner_output
         # elif self.binary_type==BINARY_AUTO_WITH_DL:     # 要改成：在线程里对整图进行运算，计算好之后直接读取，而不是每次都再运算一次
         #     if update:
         #         img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
@@ -902,6 +935,8 @@ class Mark(QMainWindow):
         self.changeResolution(0.95, self.scalep)
 
 
+
+
     def distinguishUpdate(self,value):
         self.distinguishValue = int(value)
         self.spinBoxDistinguish.setValue(int(value))
@@ -909,18 +944,17 @@ class Mark(QMainWindow):
 
     def thresholdBinaryNormalUpdate(self,value):
         self.binary_threshold_normal = int(value)
-        self.editThreshold.setText(str(value))
+        # self.editThreshold.setText(str(value))
         self.imshow(update=True)
 
     def thresholdBinaryAutoUpdate(self,value):
         self.binary_threshold_auto = int(value)
-        self.editThreshold_2.setText(str(value))
+        # self.editThreshold_2.setText(str(value))
 
         self.imshow(update=True)
 
     def binaryCloseUpdate(self,value):
         self.binary_close = int(value)
-        self.editClose.setText(str(value))
         self.imshow(update=True)
 
 
@@ -1189,7 +1223,7 @@ class Mark(QMainWindow):
             inner_binary_merged = (inner_binary_merged>0).astype(np.uint8)
 
 
-            _, hair_pairs = process.autoSkeletonExtraction(inner_binary_merged)
+            _, hair_pairs = process.autoSkeletonExtraction(inner_binary_merged,single_hair_mode=False)
 
             temp_result = []
             for joints in hair_pairs:

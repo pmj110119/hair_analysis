@@ -6,6 +6,14 @@ import cv2
 from matplotlib import pyplot as plt
 #from scipy.io import savemat
 
+
+def erosion(src, erosion_size = 3):
+    erosion_shape = cv2.MORPH_RECT
+    element = cv2.getStructuringElement(erosion_shape, (2 * erosion_size + 1, 2 * erosion_size + 1),
+                                        (erosion_size, erosion_size))
+    return cv2.erode(src, element)
+    #cv.imshow(title_erosion_window, erosion_dst)
+
 class UFS: # a union-find set（并查集）
     def __init__(self):
         self.fa = {}
@@ -110,6 +118,7 @@ def find_endpoint(binary, r = 10, degree_thres = 60):
     del tmp
     
     def _is_endpoint(binary, x, y):
+        
         if (binary[x, y] == 0) or ((binary[x-1, y] & binary[x, y-1] & binary[x+1, y] & binary[x, y+1]) == 1):
             return None
 
@@ -134,6 +143,7 @@ def find_endpoint(binary, r = 10, degree_thres = 60):
                 candidates[(i - r, j - r)] = angle
     
     return _merge_endpoint(binary, candidates, 10)
+    #return candidates
 
 def endpointDetection(img_binary):
     """
@@ -144,12 +154,15 @@ def endpointDetection(img_binary):
             points (ndarray) : 所有检测到的端点
     """
     return find_endpoint(img_binary, r = 15, degree_thres = 60)
+    #candidates = find_endpoint(img_binary, r = 15, degree_thres = 60)
+    #candidates_ = find_endpoint(erosion(img_binary, 3), r = 15, degree_thres = 60)
+    #candidates.update( candidates_ )
+    #return _merge_endpoint(img_binary, candidates, 10)
 
 if (__name__ == "__main__"):
     
     img = cv2.imread('binary.jpg', cv2.IMREAD_GRAYSCALE)
     binary = (img > 127).astype('uint8')
-    binary = binary[:400, :400]
     
     ans = endpointDetection(binary)
 

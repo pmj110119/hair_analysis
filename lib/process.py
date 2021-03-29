@@ -134,7 +134,7 @@ class BasicProcess():
         return binary
 
     # 代超
-    def autoSkeletonExtraction(self, img_binary, step=10):
+    def autoSkeletonExtraction(self, img_binary, step=10, single_hair_mode=True):
         """[输入二值图，输出所有检测到的端点]
             Args:
                 img_binary (ndarray):   [单通道二值图]
@@ -142,7 +142,7 @@ class BasicProcess():
                 points (list):          [点坐标序列]     样例 --> [[x0,y0],[x1,y1],[x2,y2]]
         """
         endpoints = endpointDetection(img_binary)
-        paths_full = skeletonExtraction(img_binary, endpoints)
+        paths_full = skeletonExtraction(img_binary, endpoints,single_hair_mode=single_hair_mode)
         paths = []
         for path_joints in paths_full:
             joints = []

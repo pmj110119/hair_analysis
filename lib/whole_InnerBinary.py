@@ -289,17 +289,17 @@ def whole_InnerBinary(img_bgr, img_mask):
     #     binary_one_point = innerBinary(img_bgr, point)
     #     binary = np.logical_or(binary, binary_one_point)
     #     m = m+1
-    # binary = np.uint8(binary)*255
+    binary = np.uint8(binary)*255
     # print("生长次数：",m)
     return binary
     # return bw
        
     
 if __name__ == '__main__':
-    img_bgr = cv2.imread("103ACDLJ.jpg")
-    img_mask = cv2.imread("103ACDLJ.jpg.png", cv2.IMREAD_GRAYSCALE)
+    img_bgr = cv2.imread("124DDBSY.jpg")
+    img_mask = cv2.imread("124DDBSY.jpg.png", cv2.IMREAD_GRAYSCALE)
     binary = whole_InnerBinary(img_bgr, img_mask)
-    cv2.imwrite("103_inner_whole_new.jpg", binary)
+    cv2.imwrite("124DDBSY.jpg.inner.png", binary)
     plt.imshow(binary, cmap='Greys_r')
     plt.axis('off')
     plt.title(binary)
