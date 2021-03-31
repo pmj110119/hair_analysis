@@ -13,7 +13,7 @@ import heapq
 from numba import jit
 
 @jit(nopython = True)
-def dijkstra(Img, D, Start, Endlist, single_hair_mode = True):
+def dijkstra(Img, D, Start, Endlist):
     
     rows, cols = D.shape[:2]
     stx, sty = Start
@@ -49,13 +49,6 @@ def dijkstra(Img, D, Start, Endlist, single_hair_mode = True):
         if ( (nowx, nowy) in targets):
             targets.remove((nowx, nowy))
             connected_target += 1
-
-            ####### alpha版本：连通域中只能有两个端点
-            if (single_hair_mode) and (connected_target > 1):
-                ###### 找过的路径全部作废
-                dist = np.ones((rows, cols)) * np.inf
-                lastx = np.ones((rows, cols), dtype = np.int32) * (-1)
-                break
 
         if (len(targets) == 0) or (nowdist > 10000.) : # there is no need to explore further
             break
@@ -144,7 +137,7 @@ if __name__ == "__main__":
                 
                 if (len(shortestpath)):
                     shortestpath = np.array(shortestpath)
-                    img[shortestpath[:, 0], shortestpath[:, 1]] = 0.5;
+                    img[shortestpath[:, 0], shortestpath[:, 1]] = 0.5
                     cv2.imshow('image',img)
                 
                 ClickNum = 0

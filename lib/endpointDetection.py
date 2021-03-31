@@ -4,6 +4,7 @@
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
+import math
 #from scipy.io import savemat
 
 
@@ -85,14 +86,16 @@ def _merge_endpoint(binary, candidate, r):
         #if (candidate[x, y] < candidate[xx, yy]):
         ans[(xx, yy)] += (x, y)
     
+    final_res = []
     for x, y in candidate:
         if (isinstance(ufs.fa[(x, y)], int)):
             res = (ans[(x, y)] / -ufs.fa[(x, y)])
-            ans[(x, y)] = (round(res[0]), round(res[1]))
+            ansx, ansy = (round(res[0]), round(res[1]))
+            final_res.append((ansx, ansy))
     
-    return np.array(list(ans.values()))
+    return np.array(list(magnet(binary, final_res)))
 
-def find_endpoint(binary, r = 10, degree_thres = 60):
+def find_endpoint(binary, r = 10, degree_thres = 60, endpoints = None):
     '''
     Find all of the end points of the hairs in a given binary image.
     
@@ -141,28 +144,51 @@ def find_endpoint(binary, r = 10, degree_thres = 60):
             angle = _is_endpoint(shifted, i, j)
             if (angle is not None):
                 candidates[(i - r, j - r)] = angle
-    
+
+    if (endpoints is not None):
+        for x, y in endpoints:
+            candidates[(x, y)] = 0 
     return _merge_endpoint(binary, candidates, 10)
     #return candidates
 
-def endpointDetection(img_binary):
+def magnet(binary, candidate):
+
+    n, m = binary.shape
+
+    final_res = []
+    for ansx, ansy in candidate:
+        if (binary[ansx, ansy] == 0):
+            tmp, tmpdist = None, None
+            for dx in range(  max(-10, -ansx), min(+11, n-ansx) ):
+                for dy in range( max(-10, -ansy), min(+11, m-ansy) ):
+                    ansx_, ansy_ = ansx + dx, ansy + dy
+                    curdist = math.sqrt(dx**2 +dy**2)
+                    if (binary[ansx_, ansy_] == 1) and ((tmp is None) or ( curdist < tmpdist )):
+                        tmp, tmpdist = (ansx_, ansy_), curdist
+            if (tmp is not None):
+                final_res.append( tmp )
+        else:
+            final_res.append((ansx, ansy))
+    return final_res
+
+def endpointDetection(img_binary, endpoints = None, refind = True):
     """
         输入二值图，输出所有检测到的端点。
         Args:
             img_binary (ndarray) : 单通道二值图
+            endpoints (ndarray, N * 2, optional) : 建议的点
         Returns:
             points (ndarray) : 所有检测到的端点
     """
-    return find_endpoint(img_binary, r = 15, degree_thres = 60)
-    #candidates = find_endpoint(img_binary, r = 15, degree_thres = 60)
-    #candidates_ = find_endpoint(erosion(img_binary, 3), r = 15, degree_thres = 60)
-    #candidates.update( candidates_ )
-    #return _merge_endpoint(img_binary, candidates, 10)
+    if (refind == False):
+        return magnet(img_binary, endpoints)
+    return find_endpoint(img_binary, r = 15, degree_thres = 60, endpoints = endpoints)
 
 if (__name__ == "__main__"):
     
     img = cv2.imread('binary.jpg', cv2.IMREAD_GRAYSCALE)
-    binary = (img > 127).astype('uint8')
+    binary = (img > 127).astype(np.uint8)
+    binary = binary[:400, :400]
     
     ans = endpointDetection(binary)
 

@@ -134,15 +134,16 @@ class BasicProcess():
         return binary
 
     # 代超
-    def autoSkeletonExtraction(self, img_binary, step=10, single_hair_mode=True):
+    def autoSkeletonExtraction(self, img_binary, step=10, endpoints=None, max_num_hairs=1):
         """[输入二值图，输出所有检测到的端点]
             Args:
                 img_binary (ndarray):   [单通道二值图]
             Returns:
                 points (list):          [点坐标序列]     样例 --> [[x0,y0],[x1,y1],[x2,y2]]
         """
-        endpoints = endpointDetection(img_binary)
-        paths_full = skeletonExtraction(img_binary, endpoints,single_hair_mode=single_hair_mode)
+        if endpoints is None:
+            endpoints = endpointDetection(img_binary)    # [[y0,x0], [y1,x1], ......]
+        paths_full = skeletonExtraction(img_binary, endpoints,refind=True,max_num_hairs=max_num_hairs)
         paths = []
         for path_joints in paths_full:
             joints = []
@@ -301,7 +302,11 @@ class MyProcess(BasicProcess):
             x = joints[i][1]
             waist_array[i] = calculate_width(shifted,x+r,y+r)
         #print(waist_array)
-        waist_median = round(findNearest(waist_array, np.median(waist_array)))
-        # waist_mean = round(findNearest(waist_array, np.mean(waist_array)))
-        # waist_mode = stats.mode(waist_array)[0][0]
-        return waist_median
+        waist_array = waist_array[waist_array!=0]
+        if waist_array.size != 0:
+            waist_median = round(findNearest(waist_array, np.median(waist_array)))
+            # waist_mean = round(findNearest(waist_array, np.mean(waist_array)))
+            # waist_mode = stats.mode(waist_array)[0][0]
+            return waist_median
+        else:
+            return 0

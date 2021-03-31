@@ -97,9 +97,10 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
     mysignal = pyqtSignal(list)
     mysignal_endpoints = pyqtSignal(list)
     mysignal_ratio = pyqtSignal(int)
-    def __init__(self,binary):
+    def __init__(self,binary,endpoints):
         super(AutoDetectThread, self).__init__()
         self.binary = binary
+        self.endpoints = endpoints
         self.STOP = False
     def stop(self):
         self.STOP = True
@@ -112,16 +113,52 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
                 break
             temp_result = []
             x, y, width, height, area = stats[i]
-            mask = (labels == i).astype(np.uint8)[y:(y+height),x:(x+width)]
-            endpoints, hair_pairs = process.autoSkeletonExtraction(mask, step=10)
+
+            x_min = max(x - 30, 0)
+            x_max = min(x + width + 30, self.binary.shape[1])
+            y_min = max(y - 30, 0)
+            y_max = min(y + height + 30, self.binary.shape[0])
+
+
+
+            mask = (labels == i).astype(np.uint8)[y_min:y_max,x_min:x_max]
+
+            endpoints_inner = []
+            for point in self.endpoints:  # y,x
+                x,y = point[0],point[1]
+
+                if y>=y_min and y<y_max and x>=x_min and x<x_max:
+
+                    #
+                    point_new2 = [x,y]
+                    point_new = process.magnet([x,y], self.binary*255)
+                    point_new[0] = np.clip(point_new[0], x_min, x_max-1)
+                    point_new[1] = np.clip(point_new[1], y_min, y_max-1)
+                    #
+                    # zzz = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
+                    #
+                    # # cv2.circle(zzz, (x - x_min, y - y_min), 2, (0, 255, 0), 2)
+                    # # cv2.circle(zzz, (point_new[0] - x_min, point_new[1] - y_min), 2, (255, 0, 0), 2)
+                    # # cv2.imshow('mask', zzz)
+                    # # cv2.waitKey(30)
+
+
+                    endpoints_inner.append([point_new[1] - y_min, point_new[0] - x_min])
+            if len(endpoints_inner)==0:
+                endpoints_inner = None
+            endpoints, hair_pairs = process.autoSkeletonExtraction(mask, step=10, endpoints=endpoints_inner,max_num_hairs=3)
             if len(hair_pairs)>0:
                 for joints in hair_pairs:
-                    height = process.waist(joints, mask)
-                    for joint_ in joints:  # 映射回原图坐标系
-                        joint_[0] = joint_[0] + x
-                        joint_[1] = joint_[1] + y
-                    mid = getMidPoint(joints)
-                    temp_result.append({'joints': joints, 'width': height, 'mid': mid})
+                    if len(joints)>=2:
+                        dis = calculate_dis(joints[0],joints[-1])
+                        if dis<1600:
+                            continue
+                        height = process.waist(joints, mask)
+                        for joint_ in joints:  # 映射回原图坐标系
+                            joint_[0] = joint_[0] + x_min
+                            joint_[1] = joint_[1] + y_min
+                        mid = getMidPoint(joints)
+                        temp_result.append({'joints': joints, 'width': height, 'mid': mid})
 
                 self.mysignal.emit(temp_result)  # 发射自定义信号
                 self.mysignal_ratio.emit(int(i/num_labels*100))
@@ -210,7 +247,7 @@ class Mark(QMainWindow):
         self.scalepFix = h / 1080
         self.scalep = 0.85 * self.scalepFix
 
-        self.fontSize = 12
+        self.fontSize = 18
 
         self.setResolution(self.scalep)
 
@@ -415,9 +452,9 @@ class Mark(QMainWindow):
                                 y_clip_max = y1
                             else:
                                 x_clip_min = 0
-                                x_clip_max = self.image_origin.shape[1]
+                                x_clip_max = self.image_origin.shape[1]-1
                                 y_clip_min = 0
-                                y_clip_max = self.image_origin.shape[0]
+                                y_clip_max = self.image_origin.shape[0]-1
 
                             x_min = np.clip(point[0] - 100, x_clip_min, x_clip_max)
                             x_max = np.clip(point[0] + 100, x_clip_min, x_clip_max)
@@ -432,8 +469,8 @@ class Mark(QMainWindow):
                         else:
                             if self.magnet_flag:    # 吸铁石
                                 point = process.magnet(point,self.getBinary())
-                                point[0] = np.clip(point[0],0,self.image_origin.shape[1])
-                                point[1] = np.clip(point[1],0,self.image_origin.shape[0])
+                                point[0] = np.clip(point[0],0,self.image_origin.shape[1]-1)
+                                point[1] = np.clip(point[1],0,self.image_origin.shape[0]-1)
 
                             if self.handle_bone == False:  # 新骨架
                                 bone = [point]
@@ -872,8 +909,8 @@ class Mark(QMainWindow):
         self.fontSize =  round(self.fontSize * scalep)
         font = QtGui.QFont()
         font.setFamily("Arial")  # 括号里可以设置成自己想要的其它字体
-        font.setPointSize(self.fontSize)  # 括号里的数字可以设置成自己想要的字体大小
-
+        font.setPixelSize(self.fontSize)  # 括号里的数字可以设置成自己想要的字体大小
+        #font.setPointSize(self.fontSize)  # 括号里的数字可以设置成自己想要的字体大小
 
         # 缩放UI元素
         widgetList = []
@@ -977,14 +1014,37 @@ class Mark(QMainWindow):
 
     # 子线程2：全图自动标注
     def buttonAutoDetectEvent(self):
-        self.log('全图自动标注中...')
-        self.autoDetectThread = AutoDetectThread(self.getBinary()/255)
-        self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
-        self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
-        self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
+        if len(self.result)!=0:
+            reply = QMessageBox.question(self, '确认', '是否删除已标注信息，重新自动识别？',
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.result=[]
+                self.updateAll()
+                self.log('删除成功，重新进行自动标注...')
+                try:
+                    endpoints = np.load('data/endpoints/' + self.tmp.split('/')[-1] + '.npy')
+                except:
+                    print('缺失端点npy文件')
+                    endpoints = None
+                self.autoDetectThread = AutoDetectThread(self.getBinary()/255,endpoints)
+                self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
+                self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
+                self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
 
-        self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
+                self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
+        else:
+            self.log('全图自动标注中...')
+            try:
+                endpoints = np.load('data/endpoints/' + self.tmp.split('/')[-1] + '.npy')
+            except:
+                print('缺失端点npy文件')
+                endpoints = None
+            self.autoDetectThread = AutoDetectThread(self.getBinary() / 255, endpoints)
+            self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
+            self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
+            self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
 
+            self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
 
     def autoDetectEventSignal(self,temp_result):
         self.result = temp_result + self.result #次序不能倒，否则影响handle_index
@@ -1223,7 +1283,7 @@ class Mark(QMainWindow):
             inner_binary_merged = (inner_binary_merged>0).astype(np.uint8)
 
 
-            _, hair_pairs = process.autoSkeletonExtraction(inner_binary_merged,single_hair_mode=False)
+            _, hair_pairs = process.autoSkeletonExtraction(inner_binary_merged)
 
             temp_result = []
             for joints in hair_pairs:
