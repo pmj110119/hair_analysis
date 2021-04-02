@@ -6,21 +6,8 @@ from lib.shortestPath import dijkstra
 from lib.endpointDetection import endpointDetection
 from lib.widthEstimation import waist
 from lib.intersectionDetection import intersectionDetection
-
-def evaluate_path(path):
-    """
-        打分估计`path`的形状是否像一根毛发。越小越像。
-    """
-    path = path.astype(np.float32)
-    N = len(path)
-    if (N <= 12):
-        return 0
-    dirs = path[10:, :] - path[:-10, :]
-    
-    x1, y1, x2, y2 = dirs[:-1, 0], dirs[:-1, 1], dirs[1:, 0], dirs[1:, 1]
-    angle_diff = np.arccos((x1 * x2 + y1 * y2) / np.sqrt((x1*x1 + y1*y1) * (x2*x2 + y2*y2)))
-
-    return angle_diff.std()
+from lib.smoothing import skeleton_smoothing
+from lib.pathEvaluation import evaluate_path
 
 def remove_hair(binary, path, width = 10):
     """
@@ -84,7 +71,7 @@ def skeletonExtraction_single(img_binary, endpoints = None, refind = False, thre
     # 求解两两端点之间的最短路径
     path, score = None, np.inf
     for i in range(N):
-        i2all = dijkstra(img_binary, D, endpoints[i], endpoints)
+        i2all = dijkstra(binary, D, endpoints[i], endpoints)
         for j in range(i):
             dis = i2all[j][1]
             if (j != i) and (dis < np.inf):
@@ -98,7 +85,9 @@ def skeletonExtraction_single(img_binary, endpoints = None, refind = False, thre
                     path, score = cur_path, cur_score
     return path, score
 
-def skeletonExtraction(img_binary, endpoints = None, debug = False, single_hair_mode = False, refind = False, max_num_hairs = 10):
+def skeletonExtraction(img_binary, endpoints = None, debug = False, single_hair_mode = False, refind = False, 
+                       max_num_hairs = 10, 
+                       min_length = 30):
     """
         输入二值图，返回找到的所有毛发。
         方法：逐根查找。找长得最像毛发的一条路径，将其抹去，反复迭代。
@@ -108,27 +97,32 @@ def skeletonExtraction(img_binary, endpoints = None, debug = False, single_hair_
     
     paths = []
     i = 0
-    while True:
+    while i < max_num_hairs:
         i += 1
-        path, score = skeletonExtraction_single(img_binary, endpoints, refind = refind)
-        if (path is None):
-            break
-
         if (debug):
             print("Extracting the %d-th hair...." % i)
-            paths.append( (path, (score, i)) )
-        else:
-            paths.append(path) 
 
-        if (single_hair_mode) or (i >= max_num_hairs):
+        path, score = skeletonExtraction_single(img_binary, endpoints, refind = refind, min_length = min_length)
+        if (path is None):
             break
-        img_binary = remove_hair(img_binary, path)
+        img_binary_new = remove_hair(img_binary, path)
+        path = skeleton_smoothing(img_binary, path)
+        img_binary = img_binary_new
+        if (len(path) <= min_length):
+            continue
+
         if (debug):
+            paths.append( (path, (score, i)) )
             plt.imshow(img_binary, cmap = plt.cm.gray)
             for path, info in paths:
                 path = np.array(path)
                 plt.plot(path[:, 1], path[:, 0], markersize = 1, c = 'red', marker = '.', linewidth = 0)
             plt.savefig("debug/paths_phase_%d.jpg" % i, dpi = 1200)
+        else:
+            paths.append( path ) 
+
+        if (single_hair_mode):
+            break
     
     return paths
 
@@ -144,15 +138,15 @@ def skeletonExtraction(img_binary, endpoints = None, debug = False, single_hair_
 
 if (__name__ == "__main__"):
     
-    # img = cv2.imread('binary.jpg', cv2.IMREAD_GRAYSCALE)
-    # binary = (img > 127).astype('uint8')
-    # binary = binary[200:400, 200:400]
+    img = cv2.imread('binary.jpg', cv2.IMREAD_GRAYSCALE)
+    binary = (img > 127).astype(np.uint8)
+    binary = binary[200:400, 200:400]
 
-    endpoints = np.load("endpoints.npy")
-    binary = np.load("img_binary.npy")
+    # endpoints = np.load("endpoints.npy")
+    # binary = np.load("img_binary.npy")
 
     print("Extracting skeletons...")
-    paths = skeletonExtraction(binary, endpoints, refind = True, debug = True)
+    paths = skeletonExtraction(binary, refind = True, debug = True, max_num_hairs = 20)
 
     plt.imshow(binary, cmap = plt.cm.gray)
     for path, info in paths:

@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtCore import Qt,QEvent
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+import qdarkstyle
 import sys
 import cv2 as cv
 import os
@@ -22,7 +24,7 @@ from math import  *
 from screeninfo import get_monitors
 from lib.utils import *
 from lib.process import MyProcess
-
+from lib.authorList import AuthorWindow
 process = MyProcess()
 
 import matplotlib.pyplot as plt
@@ -175,13 +177,13 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
 class BinaryWindow(QMainWindow):
     def __init__(self):
         super(BinaryWindow, self).__init__()
-        uic.loadUi("binary.ui", self)
+        uic.loadUi("assets/binary.ui", self)
 
 #图像标记类
 class Mark(QMainWindow):
     def __init__(self):
         super(Mark, self).__init__()
-        uic.loadUi("test.ui",self)
+        uic.loadUi("assets/test.ui",self)
 
 
 
@@ -256,27 +258,14 @@ class Mark(QMainWindow):
     def setMenu(self):
         self.menubar = self.menuBar()  # 获取窗体的菜单栏
 
-        self.menu = self.menubar.addMenu("菜单")
+        self.menu = self.menubar.addMenu(" 文件 ")
 
         # 二值化调整
         self.binaryMenu = QAction("二值图调整", self)
         self.binaryMenu.setShortcut("Ctrl+b")  # 设置快捷键
         self.binaryMenu.triggered.connect(self.showBinaryMenu)
         self.menu.addAction(self.binaryMenu)
-        # 调整分辨率
-        self.resolution = self.menu.addMenu("分辨率调整")
-        resolution70Action = QAction('70%', self)
-        resolution70Action.triggered.connect(self.resolution70)
-        self.resolution.addAction(resolution70Action)  # Edit下这是copy子项
-        resolution80Action = QAction('80%', self)
-        resolution80Action.triggered.connect(self.resolution80)
-        self.resolution.addAction(resolution80Action)  # Edit下这是copy子项
-        resolution90Action = QAction('90%', self)
-        resolution90Action.triggered.connect(self.resolution90)
-        self.resolution.addAction(resolution90Action)  # Edit下这是copy子项
-        resolution100Action = QAction('100%', self)
-        resolution100Action.triggered.connect(self.resolution100)
-        self.resolution.addAction(resolution100Action)  # Edit下这是copy子项
+
         # 展示好看的柱状图
         self.showBar = QAction("生成柱状图", self)
         self.showBar.setShortcut("Ctrl+p")  # 设置快捷键
@@ -293,11 +282,36 @@ class Mark(QMainWindow):
         self.binarySave.setShortcut("Ctrl+a")  # 设置快捷键
         self.binarySave.triggered.connect(self.saveBinary)
         self.menu.addAction(self.binarySave)
+
+
+
+
+        #self.menu = self.menubar.addMenu("菜单")
+        # 调整分辨率
+        self.resolution = self.menubar.addMenu(" 分辨率 ")
+        resolution70Action = QAction(' 70% ', self)
+        resolution70Action.triggered.connect(self.resolution70)
+        self.resolution.addAction(resolution70Action)  # Edit下这是copy子项
+        resolution80Action = QAction(' 80% ', self)
+        resolution80Action.triggered.connect(self.resolution80)
+        self.resolution.addAction(resolution80Action)  # Edit下这是copy子项
+        resolution90Action = QAction(' 90% ', self)
+        resolution90Action.triggered.connect(self.resolution90)
+        self.resolution.addAction(resolution90Action)  # Edit下这是copy子项
+        resolution100Action = QAction(' 100% ', self)
+        resolution100Action.triggered.connect(self.resolution100)
+        self.resolution.addAction(resolution100Action)  # Edit下这是copy子项
+
         # 帮助
-        self.help = QAction("帮助", self)
+        self.helpMenu = self.menubar.addMenu(" 帮助 ")
+        self.help = QAction(" 使用说明 ", self)
         self.help.setShortcut("Ctrl+h")  # 设置快捷键
         self.help.triggered.connect(self.showHelpDialog)
-        self.menu.addAction(self.help)
+        self.helpMenu.addAction(self.help)
+        # 作者名单
+        self.author = QAction(" 贡献者名单 ", self)
+        self.author.triggered.connect(self.showAuthorList)
+        self.helpMenu.addAction(self.author)
 
     def showBinaryMenu(self):
         self.binaryWindow = BinaryWindow()
@@ -313,6 +327,7 @@ class Mark(QMainWindow):
         # 闭运算
         self.binaryWindow.sliderBinaryClose.valueChanged.connect(self.binaryCloseUpdate)
 
+
     def showHelpDialog(self):
         dialog = QDialog()
         word = QLabel("------------------------帮助页面----------------------------------\n"
@@ -327,10 +342,8 @@ class Mark(QMainWindow):
                       "\n   - 查看二值图，切换二值图方式或调整阈值"
                       "\n   - 方向键手动调整宽度"
                       "\n 5. 单击“拔毛”按钮，已标注的毛发在右上角缩略图中会消失。"
-                      "\n    每完成一部分毛发标注后，通过“拔毛”来检查是否有漏标注"
-                      "\n\n\n    指导老师：张珏 "
-                      "\n    团队成员：吴钧杰，梁栋栋，陈代超，夏宇，潘铭杰，杨金宇 ",
-                    dialog)
+                      "\n    每完成一部分毛发标注后，通过“拔毛”来检查是否有漏标注",
+                      dialog)
         dialog.setGeometry(QRect(500, 500, 500, 400))
         # btn = QPushButton("已导出结果至 result.csv", dialog)
         # btn.move(50, 50)
@@ -338,6 +351,10 @@ class Mark(QMainWindow):
         dialog.setWindowModality(Qt.ApplicationModal)
         dialog.exec_()
 
+
+    def showAuthorList(self):
+        self.authorWindow = AuthorWindow()
+        self.authorWindow.show()
 
 
     def saveBinary(self):
@@ -1449,6 +1466,10 @@ class Mark(QMainWindow):
 
 if  __name__ == "__main__":                                 # main函数
     app = QtWidgets.QApplication(sys.argv)
+    app.setFont(QFont("微软雅黑", 9))
+    app.setWindowIcon(QIcon("icon.ico"))
+    stylesheet = qdarkstyle.load_stylesheet_pyqt5()
+    app.setStyleSheet(stylesheet)
     MainWindow = Mark()
     MainWindow.show()
     app.installEventFilter(MainWindow)

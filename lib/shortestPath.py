@@ -9,6 +9,7 @@ import numpy as np
 from scipy import ndimage
 import matplotlib.pyplot as plt
 import heapq
+from lib.smoothing import skeleton_smoothing
 
 from numba import jit
 
@@ -79,11 +80,13 @@ def dijkstra(Img, D, Start, Endlist):
         shortest_path.reverse()
         
         result.append( (shortest_path, dist[enx, eny]) )
-    
+
     return result
 
 def getShortestPath(Img, Start, End):
     
+    Img = Img.astype(np.uint8)
+
     D = ndimage.distance_transform_edt(Img == 1)
     D = np.max(D) - D + 1
     D[Img != 1] = 10000.
@@ -91,25 +94,17 @@ def getShortestPath(Img, Start, End):
     x0, y0 = map(np.int32, Start)
     x1, y1 = map(np.int32, End)
     
-    return dijkstra(Img, D, (x0, y0), np.array([(x1, y1)]) )[0]
-
-def getBinImage(image_dir,thr):
-    image0 = cv2.imread(image_dir, cv2.IMREAD_GRAYSCALE)
-    image = np.zeros(image0.shape)
-    image[image0<thr]=1
-    #cv2.imwrite('zzzz.png',image*255)
-    return image
-    # img = plt.imshow(image)
-    # img.set_cmap('gray')
-    # plt.show()
-    
+    shortest_path, dist = dijkstra(Img, D, (x0, y0), np.array([(x1, y1)]) )[0]
+    shortest_path = skeleton_smoothing(Img, shortest_path)
+    return shortest_path, dist
+ 
 if __name__ == "__main__":
     import time
     
-    image_dir = "./test.png"
-    Binthr = 200
-    img = getBinImage(image_dir,Binthr)
-    
+    img = cv2.imread('binary.jpg', cv2.IMREAD_GRAYSCALE)
+    img = (img > 127).astype(np.float32)
+    img = img[:400, :400]
+
     # StartPoint = [78,9]
     # EndPoint = [4,165]
     # shortestpath,pathdist = DijkstraShortestPath(img, StartPoint, EndPoint)
@@ -133,8 +128,8 @@ if __name__ == "__main__":
                 t0 = time.time()
                 shortestpath, dis = getShortestPath(img,StartPoint,EndPoint)
                 print("Time: ", time.time() - t0, " s")
-                print(dis, shortestpath)
-                
+                print(dis, shortestpath.tolist())
+
                 if (len(shortestpath)):
                     shortestpath = np.array(shortestpath)
                     img[shortestpath[:, 0], shortestpath[:, 1]] = 0.5
