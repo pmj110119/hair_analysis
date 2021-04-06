@@ -56,7 +56,7 @@
            </font>
           </property>
           <property name="text">
-           <string>xxx</string>
+           <string>陈代超</string>
           </property>
          </widget>
         </item>
@@ -75,7 +75,7 @@
            </font>
           </property>
           <property name="text">
-           <string>xxx</string>
+           <string>夏宇</string>
           </property>
          </widget>
         </item>
@@ -119,7 +119,7 @@
            </font>
           </property>
           <property name="text">
-           <string>xxx</string>
+           <string>梁栋栋</string>
           </property>
          </widget>
         </item>
@@ -131,7 +131,7 @@
            </font>
           </property>
           <property name="text">
-           <string>xxx</string>
+           <string>张珏</string>
           </property>
          </widget>
         </item>
@@ -150,7 +150,7 @@
            </font>
           </property>
           <property name="text">
-           <string>xxx</string>
+           <string>吴钧杰</string>
           </property>
          </widget>
         </item>
@@ -162,7 +162,7 @@
            </font>
           </property>
           <property name="text">
-           <string>xxx</string>
+           <string>杨金宇</string>
           </property>
          </widget>
         </item>
@@ -181,14 +181,14 @@
         <item row="2" column="4" rowspan="2">
          <widget class="QLabel" name="img3">
           <property name="text">
-           <string>梁栋栋</string>
+           <string>潘铭杰</string>
           </property>
          </widget>
         </item>
         <item row="2" column="3" rowspan="2">
          <widget class="QLabel" name="img2">
           <property name="text">
-           <string>潘铭杰</string>
+           <string>梁栋栋</string>
           </property>
          </widget>
         </item>
@@ -213,7 +213,7 @@
            </font>
           </property>
           <property name="text">
-           <string>xxx</string>
+           <string>潘铭杰</string>
           </property>
          </widget>
         </item>

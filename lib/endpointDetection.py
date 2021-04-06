@@ -5,97 +5,171 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 import math
+
+from numba import jit
+
+
 #from scipy.io import savemat
 
 
-def erosion(src, erosion_size = 3):
-    erosion_shape = cv2.MORPH_RECT
-    element = cv2.getStructuringElement(erosion_shape, (2 * erosion_size + 1, 2 * erosion_size + 1),
-                                        (erosion_size, erosion_size))
-    return cv2.erode(src, element)
-    #cv.imshow(title_erosion_window, erosion_dst)
+# def erosion(src, erosion_size = 3):
+#     erosion_shape = cv2.MORPH_RECT
+#     element = cv2.getStructuringElement(erosion_shape, (2 * erosion_size + 1, 2 * erosion_size + 1),
+#                                         (erosion_size, erosion_size))
+#     return cv2.erode(src, element)
+#     #cv.imshow(title_erosion_window, erosion_dst)
 
-class UFS: # a union-find set（并查集）
-    def __init__(self):
-        self.fa = {}
-    def getfa(self, i):
-        if (isinstance(self.fa[i], int)):
-            return i
-        res = self.getfa(self.fa[i])
-        self.fa[i] = res
-        return res
-    def create_node(self, i):
-        if (i not in self.fa):
-            self.fa[i] = -1
-    def merge(self, i, j):
-        self.create_node(i)
-        self.create_node(j)
-        i, j = self.getfa(i), self.getfa(j)
-        if (i == j):
-            return
-        if (self.fa[i] < self.fa[j]):
-            self.fa[i] += self.fa[j]
-            self.fa[j] = i
-        else:
-            self.fa[j] += self.fa[i]
-            self.fa[i] = j
+# class UFS: # a union-find set（并查集）
+#     def __init__(self):
+#         self.fa = {}
+#     def getfa(self, i):
+#         if (isinstance(self.fa[i], int)):
+#             return i
+#         res = self.getfa(self.fa[i])
+#         self.fa[i] = res
+#         return res
+#     def create_node(self, i):
+#         if (i not in self.fa):
+#             self.fa[i] = -1
+#     def merge(self, i, j):
+#         self.create_node(i)
+#         self.create_node(j)
+#         i, j = self.getfa(i), self.getfa(j)
+#         if (i == j):
+#             return
+#         if (self.fa[i] < self.fa[j]):
+#             self.fa[i] += self.fa[j]
+#             self.fa[j] = i
+#         else:
+#             self.fa[j] += self.fa[i]
+#             self.fa[i] = j
+
+@jit(nopython = True)
+def UFS_getfa(fax, fay, x, y):
+    if (fax[x, y] < 0):
+        return (x, y)
+    else:
+        ansx, ansy = UFS_getfa(fax, fay, fax[x, y], fay[x, y])
+        fax[x, y] = ansx
+        fay[x ,y] = ansy
+        return (ansx, ansy)
     
+@jit(nopython = True)
+def UFS_merge(fax, fay, x1, y1, x2, y2):
+    x1, y1 = UFS_getfa(fax, fay, x1, y1)
+    x2, y2 = UFS_getfa(fax, fay, x2, y2)
+    if (x1 == x2) and (y1 == y2):
+        return
+    if (fax[x1, y1] < fax[x2, y2]):
+        x1, y1, x2, y2 = x2, y2, x1, y1
+    fax[x2, y2] += fax[x1, y1]
+    fax[x1, y1], fay[x1, y1] = x2, y2
+
+@jit(nopython = True)
+def _bfs(binary, is_candidate, vis, q, r, x0, y0, fax, fay):
+    
+    n, m = binary.shape
+
+    head, tail = 0, 1
+    q[0] = (x0, y0)
+    vis[x0, y0] = True
+    
+    while (head < tail):
+        x, y = q[head]
+        head += 1
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if (dx != 0) or (dy != 0):
+                    xx, yy = x + dx, y + dy
+                    if (xx < 0) or (xx >= n)  or (yy < 0) or (yy >= m):
+                        continue
+                    if (binary[xx, yy] == 0) or (vis[xx, yy]) or (abs(xx - x0) >= r) or (abs(yy - y0) >= r):
+                        continue
+                    vis[xx, yy] = True
+                    if (is_candidate[xx, yy]):
+                        UFS_merge(fax, fay, xx, yy, x0, y0)
+                    q[tail] = (xx, yy)
+                    tail += 1
+                    
+    for i in range(tail):
+        vis[q[i][0], q[i][1]] = False
+
 def _merge_endpoint(binary, candidate, r):
     '''
     Remove redundant hits for a single endpoint in the binary image.
     '''
+    binary = binary.astype(np.uint8)
     n, m = binary.shape
     
     q = np.zeros( (4 * r * r, 2), dtype = np.int32 )
-    vis = np.zeros((n, m), dtype = bool)
-    ufs = UFS()
-    
-    def _bfs(x0, y0):
-        head, tail = 0, 1
-        q[0] = (x0, y0)
-        vis[x0, y0] = True
-        while (head < tail):
-            x, y = q[head]
-            head += 1
-            for dx in (-1, 0, 1):
-                for dy in (-1, 0, 1):
-                    if (dx != 0) or (dy != 0):
-                        xx, yy = x + dx, y + dy
-                        if (xx < 0) or (xx >= n)  or (yy < 0) or (yy >= m):
-                            continue
-                        if (binary[xx, yy] == 0) or (vis[xx, yy]) or (abs(xx - x0) >= r) or (abs(yy - y0) >= r):
-                            continue
-                        vis[xx, yy] = True
-                        if ((xx ,yy) in candidate):
-                            ufs.merge((xx, yy), (x0, y0))
-                        q[tail] = (xx, yy)
-                        tail += 1
-                        
-        for i in range(tail):
-            vis[q[i][0], q[i][1]] = False
-                        
+    vis = np.zeros((n, m), dtype = np.uint8)
+
+    is_candidate = np.zeros((n, m), dtype = np.uint8)
     for x, y in candidate:
-        ufs.create_node((x, y))
-        _bfs(x, y)
+        is_candidate[x, y] = True
+
+    fax = np.ones((n, m), dtype = np.int32) * -1
+    fay = np.ones((n, m), dtype = np.int32) * -1
+    
+    for x, y in candidate:
+        _bfs(binary, is_candidate, vis, q, np.int32(r), np.int32(x), np.int32(y), fax, fay)
     
     ans = {}
     for x, y in candidate:
-        xx, yy = ufs.getfa((x, y))
+        xx, yy = UFS_getfa(fax, fay, x, y)
+        xx, yy = np.int32(xx), np.int32(yy)
         if ((xx, yy) not in ans):
             ans[(xx, yy)] = np.array([0, 0], dtype = np.int32)
-        #if (candidate[x, y] < candidate[xx, yy]):
-        ans[(xx, yy)] += (x, y)
+        ans[(xx, yy)] += np.array([x, y], dtype = np.int32)
     
     final_res = []
     for x, y in candidate:
-        if (isinstance(ufs.fa[(x, y)], int)):
-            res = (ans[(x, y)] / -ufs.fa[(x, y)])
+        if (fax[x, y] < 0):
+            res = (ans[(x, y)] / -fax[(x, y)])
             ansx, ansy = (round(res[0]), round(res[1]))
             final_res.append((ansx, ansy))
-    
-    return np.array(list(magnet(binary, final_res)))
+    return final_res
 
-def find_endpoint(binary, r = 10, degree_thres = 60, endpoints = None):
+@jit(nopython = True)
+def _check(binary, x, y):
+    xx, yy = int(np.floor(x)), int(np.floor(y))
+    xx_, yy_ = int(np.ceil(x)), int(np.ceil(y))
+    return binary[xx, yy] or binary[xx_, yy] or binary[xx, yy_] or binary[xx_, yy_]
+
+@jit(nopython = True)
+def _find_endpoint(binary, r, degree_thres):
+    n, m = binary.shape
+    
+    shifted = np.zeros((n + 2 * r + 1, m + 2 * r + 1), dtype = np.uint8)
+    shifted[r:r+n, r:r+m] = binary
+    
+    is_candidate = np.zeros((n, m), dtype = np.uint8)
+    candidate = []
+    for i in range(r, r + n):
+        for j in range(r, r + m):
+            if (shifted[i, j] == 0)  or ((shifted[i-1, j] & shifted[i, j-1] & shifted[i+1, j] & shifted[i, j+1]) == 1):
+                continue
+            lastflag = -1
+            s = 0
+            angle = 0
+            for degree in range(361):
+                rad = degree / 360 * 2 * np.pi
+                flag = 1
+                for k in range(1, r+1):
+                    if not _check(shifted, i + np.cos(rad) * k, j + np.sin(rad) * k):
+                        flag = 0
+                        break
+                s += (flag != lastflag)
+                lastflag = flag
+                angle += (flag)
+            s -= 1
+            angle -= (lastflag)
+            if (s == 2) and (angle < degree_thres):
+                is_candidate[i - r, j - r] = 1
+                candidate.append((i-r, j-r))
+    return candidate, is_candidate
+
+def find_endpoint(binary, r = 15, degree_thres = 60, endpoints = None):
     '''
     Find all of the end points of the hairs in a given binary image.
     
@@ -110,46 +184,43 @@ def find_endpoint(binary, r = 10, degree_thres = 60, endpoints = None):
     endpoints : 2D numpy.array, [(x1, y1), (x2, y2), ...] Each row represents an end point. 
     '''
     
-    n, m = binary.shape
+    # n, m = binary.shape
     
-    tmp = np.arange(1, r + 1)[np.newaxis, :]
-    degree = (np.arange(0, 360)/360. * 2 * np.pi)[:, np.newaxis]
-    dx = np.floor(tmp * np.cos(degree)).astype(np.int32)
-    dx_ = np.ceil(tmp * np.cos(degree)).astype(np.int32)
-    dy = np.floor(tmp * np.sin(degree)).astype(np.int32)
-    dy_ = np.ceil(tmp * np.sin(degree)).astype(np.int32)
-    del tmp
+    # tmp = np.arange(1, r + 1)[np.newaxis, :]
+    # degree = (np.arange(0, 360)/360. * 2 * np.pi)[:, np.newaxis]
+    # dx = np.floor(tmp * np.cos(degree)).astype(np.int32)
+    # dx_ = np.ceil(tmp * np.cos(degree)).astype(np.int32)
+    # dy = np.floor(tmp * np.sin(degree)).astype(np.int32)
+    # dy_ = np.ceil(tmp * np.sin(degree)).astype(np.int32)
+    # del tmp
+
+    # def _is_endpoint(binary, x, y):
+    #     if (binary[x, y] == 0) or ((binary[x-1, y] & binary[x, y-1] & binary[x+1, y] & binary[x, y+1]) == 1):
+    #         return False
+    #     values = np.max( (binary[x + dx, y + dy], binary[x + dx_, y + dy], 
+    #                     binary[x + dx, y + dy_], binary[x + dx_, y + dy_]), axis = 0 )
+    #     flag = values.sum(axis = 1) == r
+    #     s = (flag[1:] != flag[:-1]).sum() + (flag[0] != flag[-1])
+    #     angle = flag.sum()
+    #     return (s == 2) and (angle < degree_thres)
     
-    def _is_endpoint(binary, x, y):
-        
-        if (binary[x, y] == 0) or ((binary[x-1, y] & binary[x, y-1] & binary[x+1, y] & binary[x, y+1]) == 1):
-            return None
+    # shifted = np.zeros((n + 2 * r + 1, m + 2 * r + 1), dtype = np.uint8)
+    # shifted[r:r+n, r:r+m] = binary
+    # candidates = set()
+    # for i in range(r, r+n):
+    #     for j in range(r, r+m):
+    #         if (_is_endpoint(shifted, i, j)):
+    #             candidates.add( (i - r, j - r) )
 
-        values = np.max( (binary[x + dx, y + dy], binary[x + dx_, y + dy], 
-                          binary[x + dx, y + dy_], binary[x + dx_, y+dy_]), axis = 0 )
-        flag = values.sum(axis = 1) == r
-        s = (flag[1:] != flag[:-1]).sum() + (flag[0] != flag[-1])
-        angle = flag.sum()
-
-        if (s == 2) and (angle < degree_thres):
-            return angle
-        else:
-            return None
-
-    shifted = np.zeros((n + 2 * r + 1, m + 2 * r + 1), dtype = np.uint8)
-    shifted[r:r+n, r:r+m] = binary
-    candidates = {}
-    for i in range(r, r+n):
-        for j in range(r, r+m):
-            angle = _is_endpoint(shifted, i, j)
-            if (angle is not None):
-                candidates[(i - r, j - r)] = angle
+    binary = np.array(binary, dtype = np.uint8)
+    candidate, is_candidate = _find_endpoint(binary, r, degree_thres)
 
     if (endpoints is not None):
         for x, y in endpoints:
-            candidates[(x, y)] = 0 
-    return _merge_endpoint(binary, candidates, 10)
-    #return candidates
+            if not is_candidate[x, y]:
+                candidate.append((x, y))
+    #print("before merge", time() - t0, "s")
+    return np.array(magnet(binary, _merge_endpoint(binary, candidate, 10)), dtype = np.int32)
 
 def magnet(binary, candidate):
 
@@ -186,14 +257,22 @@ def endpointDetection(img_binary, endpoints = None, refind = True):
 
 if (__name__ == "__main__"):
     
+    from time import time
+    
     img = cv2.imread('binary.jpg', cv2.IMREAD_GRAYSCALE)
     binary = (img > 127).astype(np.uint8)
-    binary = binary[:400, :400]
+    binary = binary[:200, 0:200]
     
+    t0 = time()
     ans = endpointDetection(binary)
+    print(time() - t0, "s")
+    t0 = time()
+    ans = endpointDetection(binary)
+    print(time() - t0, "s")
 
     plt.imshow(binary, cmap = plt.cm.gray)
     plt.plot(ans[:, 1], ans[:, 0], markersize = 1, c = 'red', marker = '.', linewidth = 0)
+    #plt.show()
     plt.savefig("endpoints.pdf", dpi = 1200)
     
     #savemat("end_points.mat", {"end_points" : ans})

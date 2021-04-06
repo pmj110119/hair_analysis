@@ -68,6 +68,10 @@ BINARY_DL = 2
 BINARY_INNER = 3
 
 
+HANDLE_Q = 0
+HANDLE_E = 1
+HANDLE_INNER = 2
+
 class InpaintThread(QThread):  # 步骤1.创建一个线程实例
     mysignal = pyqtSignal(np.ndarray)  # 创建一个自定义信号，元组参数
     def __init__(self,result,image):
@@ -99,10 +103,11 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
     mysignal = pyqtSignal(list)
     mysignal_endpoints = pyqtSignal(list)
     mysignal_ratio = pyqtSignal(int)
-    def __init__(self,binary,endpoints):
+    def __init__(self,binary,endpoints,roi=None):
         super(AutoDetectThread, self).__init__()
         self.binary = binary
         self.endpoints = endpoints
+        self.roi = roi
         self.STOP = False
     def stop(self):
         self.STOP = True
@@ -110,60 +115,73 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
         # 分离连通域
         self.mysignal_ratio.emit(0)
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(self.binary.astype(np.uint8), connectivity=8)
-        for i in range(1, num_labels):
+
+
+        if self.roi is not None:  # 提取ROI中的毛发
+            roi_indexs=[]
+            x0, x1, y0, y1 = self.roi
+            for i in range(1, num_labels):
+                x, y, width, height, area = stats[i]
+                if overlap([x0,y0,x1,y1],[x,y,x+width,y+height]): # 判断两矩形是否相交
+                    roi_indexs.append(i)
+        else:
+            roi_indexs = range(1, num_labels)
+
+        for index,i in enumerate(roi_indexs):
             if self.STOP:
                 break
+            t1 = time.time()
             temp_result = []
             x, y, width, height, area = stats[i]
-
             x_min = max(x - 30, 0)
             x_max = min(x + width + 30, self.binary.shape[1])
             y_min = max(y - 30, 0)
             y_max = min(y + height + 30, self.binary.shape[0])
 
+            mask = (labels[y_min:y_max,x_min:x_max] == i).astype(np.uint8)
 
-
-            mask = (labels == i).astype(np.uint8)[y_min:y_max,x_min:x_max]
-
+            t2 = time.time()
+            # 吸铁石
             endpoints_inner = []
             for point in self.endpoints:  # y,x
                 x,y = point[0],point[1]
-
                 if y>=y_min and y<y_max and x>=x_min and x<x_max:
-
-                    #
-                    point_new2 = [x,y]
+                    tt = time.time()
                     point_new = process.magnet([x,y], self.binary*255)
                     point_new[0] = np.clip(point_new[0], x_min, x_max-1)
                     point_new[1] = np.clip(point_new[1], y_min, y_max-1)
-                    #
-                    # zzz = cv2.cvtColor(mask * 255, cv2.COLOR_GRAY2BGR)
-                    #
-                    # # cv2.circle(zzz, (x - x_min, y - y_min), 2, (0, 255, 0), 2)
-                    # # cv2.circle(zzz, (point_new[0] - x_min, point_new[1] - y_min), 2, (255, 0, 0), 2)
-                    # # cv2.imshow('mask', zzz)
-                    # # cv2.waitKey(30)
-
-
                     endpoints_inner.append([point_new[1] - y_min, point_new[0] - x_min])
+                    #endpoints_inner.append([y - y_min, x - x_min])
+                    print('吸铁石：',time.time()-tt)
             if len(endpoints_inner)==0:
                 endpoints_inner = None
+            t3 = time.time()
+            # 自动识别
+            #print(endpoints_inner)
             endpoints, hair_pairs = process.autoSkeletonExtraction(mask, step=10, endpoints=endpoints_inner,max_num_hairs=3)
+            t4 = time.time()
+            #
             if len(hair_pairs)>0:
                 for joints in hair_pairs:
                     if len(joints)>=2:
                         dis = calculate_dis(joints[0],joints[-1])
                         if dis<1600:
                             continue
+                        tt = time.time()
                         height = process.waist(joints, mask)
+                        tt2 = time.time()
+                        print('waist:',tt2-tt)
                         for joint_ in joints:  # 映射回原图坐标系
                             joint_[0] = joint_[0] + x_min
                             joint_[1] = joint_[1] + y_min
                         mid = getMidPoint(joints)
+                        print('geiMidPoint:', time.time() - tt2)
                         temp_result.append({'joints': joints, 'width': height, 'mid': mid})
 
                 self.mysignal.emit(temp_result)  # 发射自定义信号
-                self.mysignal_ratio.emit(int(i/num_labels*100))
+                self.mysignal_ratio.emit(int(100.0*index/len(roi_indexs)))
+            t5 = time.time()
+            print(t2-t1,t3-t2,t4-t3,t5-t4)
             if DEBUG:
                 for endpoint in endpoints:
                     endpoint = [endpoint[1], endpoint[0]]
@@ -238,8 +256,9 @@ class Mark(QMainWindow):
         self.tmp = 'default'
 
         self.mousePressFlag = False
+        self.autoRoiPressFlag = False
 
-        self.innerHandle = True
+        self.handleMode = 0
         self.initUI()
 
     # 根据屏幕分辨率设置界面大小
@@ -384,7 +403,8 @@ class Mark(QMainWindow):
 
         # 手动标注模式的选择
         self.radioHangleModeAuto.toggled.connect(self.handleModeChanged_Auto)
-        self.radioHangleModeHandle.toggled.connect(self.handleModeChanged_Handle)
+        self.radioHangleModeHandleQ.toggled.connect(self.handleModeChanged_HandleQ)
+        self.radioHangleModeHandleE.toggled.connect(self.handleModeChanged_HandleE)
 
 
 
@@ -460,7 +480,8 @@ class Mark(QMainWindow):
                 if (point[0] > 0 and point[1] > 0):
 
                     if event.button() == Qt.LeftButton:
-                        if self.innerHandle == True:
+                        if self.handleMode == HANDLE_INNER:
+                            self.handle_index = -2
                             if self.roiInf_corrected is not None:
                                 x0, x1, y0, y1 = self.roiInf_corrected
                                 x_clip_min = x0
@@ -510,7 +531,6 @@ class Mark(QMainWindow):
 
                             self.imshow()
 
-
                     elif event.button() == Qt.RightButton:
                         self.checkThisHair()
                         #self.handle_bone = False
@@ -532,7 +552,20 @@ class Mark(QMainWindow):
                         self.imshow()
                         pass
 
-                    
+
+            #         elif event.button() == Qt.MiddleButton:
+            #             self.autoRoiPressFlag = True
+            #             self.autoRoi = [point[0], point[1], 0, 0]
+            #
+            # if event.type() == QEvent.MouseButtonRelease and self.autoRoiPressFlag == True:
+            #     self.autoRoiPressFlag = False
+            #     self.autoRoi[2:4] = [point[0], point[1]]
+            #
+            # if self.autoRoiPressFlag and event.type() == QEvent.MouseMove:
+            #     self.autoRoi[2:4] = [point[0], point[1]]
+
+
+
 
             if event.type()==QEvent.MouseMove:
                 [x, y] = [event.pos().x(), event.pos().y()]
@@ -800,13 +833,19 @@ class Mark(QMainWindow):
 
     def handleModeChanged_Auto(self,isChecked) :
         if isChecked:
-            self.innerHandle = True
+            self.handle_index = -2
             self.innerClear()
-    def handleModeChanged_Handle(self,isChecked) :
+            self.handleMode = HANDLE_INNER
+    def handleModeChanged_HandleQ(self,isChecked) :
         if isChecked:
-            self.innerHandle = False
+            self.handle_index = -2
             self.innerClear()
-
+            self.handleMode = HANDLE_Q
+    def handleModeChanged_HandleE(self,isChecked) :
+        if isChecked:
+            self.handle_index = -2
+            self.innerClear()
+            self.handleMode = HANDLE_E
 
     
     def buttonSaveEvent(self):
@@ -1031,32 +1070,40 @@ class Mark(QMainWindow):
 
     # 子线程2：全图自动标注
     def buttonAutoDetectEvent(self):
-        if len(self.result)!=0:
+        if self.autoDetectThread is not None:
+            self.autoDetectThread.stop()
+            if self.autoDetectRatio != 100:
+                self.log('自动标注中止')
+        x0,x1,y0,y1 = self.roiInf_corrected
+        if len(self.result)!=0 and (x0==0 and y0==0 and x1==self.image_origin.shape[1] and y1==self.image_origin.shape[0]):
             reply = QMessageBox.question(self, '确认', '是否删除已标注信息，重新自动识别？',
                                          QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.result=[]
+                self.handle_index = -2
                 self.updateAll()
                 self.log('删除成功，重新进行自动标注...')
+                self.img_impaint = self.image_origin
+                self.imshow_small_picture()
                 try:
                     endpoints = np.load('data/endpoints/' + self.tmp.split('/')[-1] + '.npy')
                 except:
                     print('缺失端点npy文件')
                     endpoints = None
-                self.autoDetectThread = AutoDetectThread(self.getBinary()/255,endpoints)
+                self.autoDetectThread = AutoDetectThread(self.getBinary()/255,endpoints,self.roiInf_corrected)
                 self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
                 self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
                 self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
 
                 self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
         else:
-            self.log('全图自动标注中...')
+            self.log('ROI区域自动标注中...')
             try:
                 endpoints = np.load('data/endpoints/' + self.tmp.split('/')[-1] + '.npy')
             except:
                 print('缺失端点npy文件')
                 endpoints = None
-            self.autoDetectThread = AutoDetectThread(self.getBinary() / 255, endpoints)
+            self.autoDetectThread = AutoDetectThread(self.getBinary() / 255, endpoints, self.roiInf_corrected)
             self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
             self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
             self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
@@ -1075,6 +1122,7 @@ class Mark(QMainWindow):
         self.autoDetectBar.setValue(ratio)
         if ratio==100:
             self.log('自动标注完成!')
+            self.buttonImpaintEvent()
 
     def autoDetectEndpointEventSignal(self,endpoints):
         self.endpoints = endpoints
@@ -1273,69 +1321,68 @@ class Mark(QMainWindow):
     def keyPressEvent(self, QKeyEvent):
         if self.img_loaded==False:
             return
-        # 确认
-        if QKeyEvent.key() == Qt.Key_E:
-            self.checkThisHair()
+
+        if QKeyEvent.key() == Qt.Key_Return:  # 回车
+            if self.handleMode==HANDLE_Q:
+                self.generateHairPath()
+            elif self.handleMode==HANDLE_E:
+                self.checkThisHair()
+            elif self.handleMode==HANDLE_INNER:
+                if len(self.inner_stack) <= 0:
+                    return
+                x_min = 9999
+                x_max = 0
+                y_min = 9999
+                y_max = 0
+                for [x0, x1, y0, y1], _ in self.inner_stack:
+                    x_min = min(x_min, x0)
+                    x_max = max(x_max, x1)
+                    y_min = min(y_min, y0)
+                    y_max = max(y_max, y1)
+                inner_binary_merged = np.zeros((y_max - y_min, x_max - x_min), np.uint8)
+                for [x0, x1, y0, y1], roi_binary in self.inner_stack:
+                    inner_binary_merged[(y0 - y_min):(y1 - y_min), (x0 - x_min):(x1 - x_min)] += roi_binary
+                inner_binary_merged = (inner_binary_merged > 0).astype(np.uint8)
+
+                _, hair_pairs = process.autoSkeletonExtraction(inner_binary_merged,max_num_hairs=3)
+
+                temp_result = []
+                for joints in hair_pairs:
+                    height = process.waist(joints, inner_binary_merged)
+                    for joint in joints:
+                        joint[0] = joint[0] + x_min
+                        joint[1] = joint[1] + y_min
+                    mid = getMidPoint(joints)
+                    temp_result.append({'joints': joints, 'width': height, 'mid': mid})
+                self.result += temp_result
+
+                self.inner_stack = []
+
             self.updateAll()
             return
-        elif QKeyEvent.key() == Qt.Key_Q:
-            self.generateHairPath()
-            self.updateAll()
-            return
-        elif QKeyEvent.key() == Qt.Key_I:
-            if len(self.inner_stack)<=0:
-                return
-            x_min = 9999
-            x_max = 0
-            y_min = 9999
-            y_max = 0
-            for [x0, x1, y0, y1], _ in self.inner_stack:
-                x_min = min(x_min,x0)
-                x_max = max(x_max,x1)
-                y_min = min(y_min, y0)
-                y_max = max(y_max, y1)
-            inner_binary_merged = np.zeros((y_max-y_min, x_max-x_min),np.uint8)
-            for [x0, x1, y0, y1],roi_binary in self.inner_stack:
-                inner_binary_merged[(y0-y_min):(y1-y_min), (x0-x_min):(x1-x_min)] += roi_binary
-            inner_binary_merged = (inner_binary_merged>0).astype(np.uint8)
 
 
-            _, hair_pairs = process.autoSkeletonExtraction(inner_binary_merged)
-
-            temp_result = []
-            for joints in hair_pairs:
-                height = process.waist(joints, inner_binary_merged)
-                for joint in joints:
-                    joint[0] = joint[0] + x_min
-                    joint[1] = joint[1] + y_min
-                mid = getMidPoint(joints)
-                temp_result.append({'joints': joints, 'width': height, 'mid': mid})
-            self.result += temp_result
-
-            self.inner_stack = []
-            self.updateAll()
-
-
-            return
-        elif QKeyEvent.key() == Qt.Key_O:
-            self.innerClear()
-            self.imshow()
-            return
 
 
         #参数1  控件
         if(len(self.result)<1):
             return
         if QKeyEvent.key()== Qt.Key_Backspace:  # 删除
-            self.handle_bone = False
-            self.result.pop(self.handle_index)
+            if self.handleMode == HANDLE_INNER:
+                self.innerClear()
+                self.imshow()
 
 
-            if len(self.result)==0:
-                self.handle_index = -2
-            else:
-                self.handle_index = -1
-            self.updateAll()
+            if self.handle_index!=-2:
+                self.handle_bone = False
+                self.result.pop(self.handle_index)
+
+
+                if len(self.result)==0:
+                    self.handle_index = -2
+                else:
+                    self.handle_index = -1
+                self.updateAll()
 
         if (len(self.result) < 1):
             return

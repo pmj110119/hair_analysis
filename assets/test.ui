@@ -17,9 +17,9 @@
    <widget class="QGroupBox" name="groupBox_4">
     <property name="geometry">
      <rect>
-      <x>940</x>
+      <x>1030</x>
       <y>732</y>
-      <width>891</width>
+      <width>801</width>
       <height>341</height>
      </rect>
     </property>
@@ -71,7 +71,7 @@
      </property>
      <property name="text">
       <string>总根数
-sum</string>
+Sum</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_7">
@@ -90,7 +90,7 @@ sum</string>
      </property>
      <property name="text">
       <string>宽度众数
-mode</string>
+Mode</string>
      </property>
     </widget>
     <widget class="QLineEdit" name="statusMode">
@@ -133,7 +133,7 @@ mode</string>
      </property>
      <property name="text">
       <string>宽度中位数
-median</string>
+Median</string>
      </property>
     </widget>
     <widget class="QLineEdit" name="statusMedian">
@@ -176,7 +176,7 @@ median</string>
      </property>
      <property name="text">
       <string>宽度均值
-mean</string>
+Mean</string>
      </property>
     </widget>
     <widget class="QLineEdit" name="statusMean">
@@ -206,9 +206,9 @@ mean</string>
     <widget class="QLabel" name="label_11">
      <property name="geometry">
       <rect>
-       <x>420</x>
+       <x>410</x>
        <y>33</y>
-       <width>91</width>
+       <width>131</width>
        <height>51</height>
       </rect>
      </property>
@@ -219,7 +219,7 @@ mean</string>
      </property>
      <property name="text">
       <string>宽度阈值
-width split</string>
+Width Threshold</string>
      </property>
     </widget>
     <widget class="QLineEdit" name="statusStd">
@@ -262,15 +262,15 @@ width split</string>
      </property>
      <property name="text">
       <string>宽度方差
-var</string>
+Var</string>
      </property>
     </widget>
     <widget class="QSlider" name="sliderDistinguish">
      <property name="geometry">
       <rect>
-       <x>510</x>
+       <x>560</x>
        <y>50</y>
-       <width>231</width>
+       <width>151</width>
        <height>20</height>
       </rect>
      </property>
@@ -305,7 +305,7 @@ var</string>
       </font>
      </property>
      <property name="text">
-      <string>细毛 soft</string>
+      <string>细毛 Soft</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_16">
@@ -313,7 +313,7 @@ var</string>
       <rect>
        <x>230</x>
        <y>30</y>
-       <width>91</width>
+       <width>101</width>
        <height>41</height>
       </rect>
      </property>
@@ -323,7 +323,7 @@ var</string>
       </font>
      </property>
      <property name="text">
-      <string>粗毛 tough</string>
+      <string>粗毛 Tough</string>
      </property>
     </widget>
     <widget class="QLineEdit" name="statusMode_2">
@@ -452,8 +452,8 @@ var</string>
      </property>
      <property name="geometry">
       <rect>
-       <x>780</x>
-       <y>43</y>
+       <x>730</x>
+       <y>40</y>
        <width>71</width>
        <height>31</height>
       </rect>
@@ -478,8 +478,8 @@ var</string>
       <rect>
        <x>410</x>
        <y>90</y>
-       <width>481</width>
-       <height>171</height>
+       <width>391</width>
+       <height>191</height>
       </rect>
      </property>
      <layout class="QHBoxLayout" name="graph"/>
@@ -488,7 +488,7 @@ var</string>
      <property name="geometry">
       <rect>
        <x>333</x>
-       <y>140</y>
+       <y>143</y>
        <width>71</width>
        <height>71</height>
       </rect>
@@ -500,16 +500,16 @@ var</string>
      </property>
      <property name="text">
       <string>数量
-number</string>
+Number</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_2">
      <property name="geometry">
       <rect>
-       <x>600</x>
-       <y>270</y>
-       <width>101</width>
-       <height>51</height>
+       <x>530</x>
+       <y>289</y>
+       <width>181</width>
+       <height>41</height>
       </rect>
      </property>
      <property name="font">
@@ -518,8 +518,7 @@ number</string>
       </font>
      </property>
      <property name="text">
-      <string>毛发宽度
-hair width</string>
+      <string>毛发宽度  Hair Width</string>
      </property>
     </widget>
    </widget>
@@ -604,7 +603,7 @@ hair width</string>
      <rect>
       <x>620</x>
       <y>740</y>
-      <width>321</width>
+      <width>391</width>
       <height>331</height>
      </rect>
     </property>
@@ -617,7 +616,7 @@ hair width</string>
        <property name="frameShadow">
         <enum>QFrame::Raised</enum>
        </property>
-       <layout class="QGridLayout" name="gridLayout" rowstretch="0,2,1">
+       <layout class="QGridLayout" name="gridLayout" rowstretch="0,0,0">
         <property name="leftMargin">
          <number>0</number>
         </property>
@@ -633,18 +632,10 @@ hair width</string>
         <item row="0" column="0" colspan="2">
          <widget class="QTextBrowser" name="logBrowser"/>
         </item>
-        <item row="1" column="1">
-         <widget class="QPushButton" name="buttonImpaint">
-          <property name="font">
-           <font>
-            <pointsize>11</pointsize>
-           </font>
-          </property>
-          <property name="focusPolicy">
-           <enum>Qt::NoFocus</enum>
-          </property>
-          <property name="text">
-           <string>拔毛</string>
+        <item row="2" column="0" colspan="2">
+         <widget class="QProgressBar" name="autoDetectBar">
+          <property name="value">
+           <number>0</number>
           </property>
          </widget>
         </item>
@@ -663,10 +654,18 @@ hair width</string>
           </property>
          </widget>
         </item>
-        <item row="2" column="0" colspan="2">
-         <widget class="QProgressBar" name="autoDetectBar">
-          <property name="value">
-           <number>0</number>
+        <item row="1" column="1">
+         <widget class="QPushButton" name="buttonImpaint">
+          <property name="font">
+           <font>
+            <pointsize>11</pointsize>
+           </font>
+          </property>
+          <property name="focusPolicy">
+           <enum>Qt::NoFocus</enum>
+          </property>
+          <property name="text">
+           <string>拔毛</string>
           </property>
          </widget>
         </item>
@@ -682,7 +681,7 @@ hair width</string>
         <property name="geometry">
          <rect>
           <x>20</x>
-          <y>30</y>
+          <y>110</y>
           <width>291</width>
           <height>31</height>
          </rect>
@@ -696,20 +695,20 @@ hair width</string>
          <enum>Qt::NoFocus</enum>
         </property>
         <property name="text">
-         <string>内点魔术棒   I键生成   O键删除</string>
+         <string>内点辅助魔术棒 </string>
         </property>
         <property name="checked">
-         <bool>true</bool>
+         <bool>false</bool>
         </property>
        </widget>
-       <widget class="QRadioButton" name="radioHangleModeHandle">
+       <widget class="QRadioButton" name="radioHangleModeHandleQ">
         <property name="enabled">
          <bool>true</bool>
         </property>
         <property name="geometry">
          <rect>
           <x>20</x>
-          <y>80</y>
+          <y>25</y>
           <width>151</width>
           <height>31</height>
          </rect>
@@ -723,17 +722,17 @@ hair width</string>
          <enum>Qt::NoFocus</enum>
         </property>
         <property name="text">
-         <string>标注端点 </string>
+         <string>端点辅助提取器</string>
         </property>
         <property name="checked">
-         <bool>false</bool>
+         <bool>true</bool>
         </property>
        </widget>
        <widget class="QCheckBox" name="checkMagnetFlag">
         <property name="geometry">
          <rect>
-          <x>180</x>
-          <y>70</y>
+          <x>200</x>
+          <y>60</y>
           <width>131</width>
           <height>51</height>
          </rect>
@@ -747,29 +746,96 @@ hair width</string>
          <enum>Qt::NoFocus</enum>
         </property>
         <property name="text">
-         <string>吸铁石功能
-magnet</string>
+         <string>吸铁石</string>
         </property>
         <property name="checked">
          <bool>true</bool>
         </property>
        </widget>
-       <widget class="QLabel" name="label_3">
+       <widget class="QRadioButton" name="radioHangleModeHandleE">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
         <property name="geometry">
          <rect>
-          <x>30</x>
-          <y>120</y>
-          <width>271</width>
+          <x>20</x>
+          <y>68</y>
+          <width>151</width>
           <height>31</height>
          </rect>
         </property>
+        <property name="font">
+         <font>
+          <pointsize>10</pointsize>
+         </font>
+        </property>
+        <property name="focusPolicy">
+         <enum>Qt::NoFocus</enum>
+        </property>
         <property name="text">
-         <string> Q键自动找路径  E键仅测宽</string>
+         <string>纯手工</string>
+        </property>
+        <property name="checked">
+         <bool>false</bool>
         </property>
        </widget>
       </widget>
      </item>
     </layout>
+   </widget>
+   <widget class="QLabel" name="label_14">
+    <property name="geometry">
+     <rect>
+      <x>210</x>
+      <y>30</y>
+      <width>181</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>11</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>标注区域</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_17">
+    <property name="geometry">
+     <rect>
+      <x>1030</x>
+      <y>30</y>
+      <width>181</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>11</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>二值图</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_18">
+    <property name="geometry">
+     <rect>
+      <x>210</x>
+      <y>710</y>
+      <width>181</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>11</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>缩略图</string>
+    </property>
    </widget>
   </widget>
  </widget>

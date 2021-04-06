@@ -155,3 +155,20 @@ def midUpsample(joints):
 
 def calculate_dis(point1,point2):
     return (point2[0] - point1[0]) * (point2[0] - point1[0]) + (point2[1] - point1[1]) * (point2[1] - point1[1])
+
+
+
+def overlap(box1, box2):
+    # 判断两个矩形是否相交
+    # 思路来源于:https://www.cnblogs.com/avril/archive/2013/04/01/2993875.html
+    # 然后把思路写成了代码
+    minx1, miny1, maxx1, maxy1 = box1
+    minx2, miny2, maxx2, maxy2 = box2
+    minx = max(minx1, minx2)
+    miny = max(miny1, miny2)
+    maxx = min(maxx1, maxx2)
+    maxy = min(maxy1, maxy2)
+    if minx > maxx or miny > maxy:
+        return False
+    else:
+        return True

@@ -1,5 +1,8 @@
 import numpy as np
-from scipy.fft import fft, ifft
+try:
+    from scipy.fft import fft, ifft
+except:
+    from scipy import fft, ifft
 
 from lib.pathEvaluation import evaluate_path as evaluate_angle_diff
 
@@ -47,10 +50,10 @@ def correcting_(path, r, c):
     '''
         对路径中超过图片边界的点进行校正。
     '''
-    path[ path[:, 0]>=r , 0] = r-1
-    path[ path[:, 0]<0 , 0] = 0
-    path[ path[:, 0]>=c , 0] = c-1
-    path[ path[:, 0]<0 , 0] = 0
+    path[ path[:, 0] >= r , 0] = r-1
+    path[ path[:, 0] < 0 , 0] = 0
+    path[ path[:, 1] >= c , 1] = c-1
+    path[ path[:, 1] < 0 , 1] = 0
     return path
 
 def evaluate(binary, path):
