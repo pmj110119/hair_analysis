@@ -5,8 +5,9 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 import math
-
+import time
 from numba import jit
+from numba.typed import List, Dict
 
 
 #from scipy.io import savemat
@@ -94,6 +95,7 @@ def _bfs(binary, is_candidate, vis, q, r, x0, y0, fax, fay):
     for i in range(tail):
         vis[q[i][0], q[i][1]] = False
 
+@jit(nopython = True)
 def _merge_endpoint(binary, candidate, r):
     '''
     Remove redundant hits for a single endpoint in the binary image.
@@ -114,7 +116,7 @@ def _merge_endpoint(binary, candidate, r):
     for x, y in candidate:
         _bfs(binary, is_candidate, vis, q, np.int32(r), np.int32(x), np.int32(y), fax, fay)
     
-    ans = {}
+    ans = Dict()
     for x, y in candidate:
         xx, yy = UFS_getfa(fax, fay, x, y)
         xx, yy = np.int32(xx), np.int32(yy)
@@ -122,11 +124,11 @@ def _merge_endpoint(binary, candidate, r):
             ans[(xx, yy)] = np.array([0, 0], dtype = np.int32)
         ans[(xx, yy)] += np.array([x, y], dtype = np.int32)
     
-    final_res = []
+    final_res = List()
     for x, y in candidate:
         if (fax[x, y] < 0):
             res = (ans[(x, y)] / -fax[(x, y)])
-            ansx, ansy = (round(res[0]), round(res[1]))
+            ansx, ansy = np.int32(round(res[0])), np.int32(round(res[1]))
             final_res.append((ansx, ansy))
     return final_res
 
@@ -144,7 +146,7 @@ def _find_endpoint(binary, r, degree_thres):
     shifted[r:r+n, r:r+m] = binary
     
     is_candidate = np.zeros((n, m), dtype = np.uint8)
-    candidate = []
+    candidate = List()
     for i in range(r, r + n):
         for j in range(r, r + m):
             if (shifted[i, j] == 0)  or ((shifted[i-1, j] & shifted[i, j-1] & shifted[i+1, j] & shifted[i, j+1]) == 1):
@@ -166,7 +168,7 @@ def _find_endpoint(binary, r, degree_thres):
             angle -= (lastflag)
             if (s == 2) and (angle < degree_thres):
                 is_candidate[i - r, j - r] = 1
-                candidate.append((i-r, j-r))
+                candidate.append((np.int32(i-r), np.int32(j-r)))
     return candidate, is_candidate
 
 def find_endpoint(binary, r = 15, degree_thres = 60, endpoints = None):
@@ -218,28 +220,32 @@ def find_endpoint(binary, r = 15, degree_thres = 60, endpoints = None):
     if (endpoints is not None):
         for x, y in endpoints:
             if not is_candidate[x, y]:
-                candidate.append((x, y))
+                candidate.append((np.int32(x), np.int32(y)))
     #print("before merge", time() - t0, "s")
     return np.array(magnet(binary, _merge_endpoint(binary, candidate, 10)), dtype = np.int32)
 
+#@jit(nopython = True)
 def magnet(binary, candidate):
 
     n, m = binary.shape
 
-    final_res = []
+    final_res = List()
     for ansx, ansy in candidate:
+        if (ansx < 0) or (ansx >= n) or (ansy < 0) or (ansy >= m):
+            continue
         if (binary[ansx, ansy] == 0):
-            tmp, tmpdist = None, None
+            tmp, tmpdist = (-1, -1), -1.0
             for dx in range(  max(-10, -ansx), min(+11, n-ansx) ):
                 for dy in range( max(-10, -ansy), min(+11, m-ansy) ):
                     ansx_, ansy_ = ansx + dx, ansy + dy
                     curdist = math.sqrt(dx**2 +dy**2)
-                    if (binary[ansx_, ansy_] == 1) and ((tmp is None) or ( curdist < tmpdist )):
+                    if (binary[ansx_, ansy_] == 1) and ((tmpdist < 0) or ( curdist < tmpdist )):
                         tmp, tmpdist = (ansx_, ansy_), curdist
-            if (tmp is not None):
+            if (tmpdist > 0):
                 final_res.append( tmp )
         else:
             final_res.append((ansx, ansy))
+    
     return final_res
 
 def endpointDetection(img_binary, endpoints = None, refind = True):
@@ -252,7 +258,7 @@ def endpointDetection(img_binary, endpoints = None, refind = True):
             points (ndarray) : 所有检测到的端点
     """
     if (refind == False):
-        return magnet(img_binary, endpoints)
+        return np.array(magnet(img_binary, endpoints), dtype = np.int32)
     return find_endpoint(img_binary, r = 15, degree_thres = 60, endpoints = endpoints)
 
 if (__name__ == "__main__"):

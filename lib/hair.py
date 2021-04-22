@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from math import *
 from PIL import Image,ImageDraw
-import scipy as sp
 import glob
 from scipy.interpolate import splprep  # 增加该行
+from scipy.interpolate import splev
 def getOrientation(pts):
     sz = len(pts)
     data_pts = np.empty((sz, 2), dtype=np.float64)
@@ -345,9 +345,9 @@ def fitCurve(joint):
         for idx,joint in enumerate(joint):
             x[idx] = joint[0]
             y[idx] = joint[1]
-        tcktuples, uarray = sp.interpolate.splprep([x, y],k=k,s=0)
+        tcktuples, uarray = splprep([x, y],k=k,s=0)
         unew = np.arange(0, 1.02, 0.02)
-        splinevalues = sp.interpolate.splev(unew, tcktuples)
+        splinevalues = splev(unew, tcktuples)
         new_joint = []
         for x,y in zip(splinevalues[0],splinevalues[1]):
             new_joint.append([x,y])
@@ -454,8 +454,11 @@ def endpoint_plot(img,endpoints,color1=(0, 200, 150),alpha=1,roi=None):
     return overlapping
 
 
-def saveDataset(path):
-    labels = glob.glob('*.json')
+def getSegmentation(img,result):
+    curve = np.zeros_like(img,np.uint8)
+    curve = curve_plot(curve,result,color1=(255,255,255),color2=(255,255,255))
+    return curve
+
 
 
 

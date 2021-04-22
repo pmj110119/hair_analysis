@@ -58,7 +58,7 @@ def correcting_(path, r, c):
 
 def evaluate(binary, path):
     N = len(path)
-    if (N == 0):
+    if (N <= 1):
         return np.inf
     return evaluate_angle_diff(path) + (1. - binary[path[:, 0], path[:, 1]].sum() / N)
 

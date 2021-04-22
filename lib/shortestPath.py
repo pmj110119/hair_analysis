@@ -12,6 +12,7 @@ import heapq
 from lib.smoothing import skeleton_smoothing
 
 from numba import jit
+from numba.typed import List
 
 @jit(nopython = True)
 def dijkstra(Img, D, Start, Endlist):
@@ -67,7 +68,7 @@ def dijkstra(Img, D, Start, Endlist):
                             lasty[nextx, nexty] = nowy
                             heapq.heappush(heap, (nextdist, (nextx, nexty)))
     
-    result = []
+    result = List()
     
     for enx, eny in Endlist:
     

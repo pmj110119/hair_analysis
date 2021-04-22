@@ -1,7 +1,10 @@
 import numpy as np
 from math import *
 import cv2
+import math
+import time
 
+from numba.typed import List, Dict
 
 def imageMergeMask(img, mask, invert=False):
     # 掩模显示背景
@@ -71,9 +74,9 @@ def midUpsample(joints):
         x1 = joints[1][0]
         y1 = joints[1][1]
         new_joints.append([x0,y0])
-        new_joints.append([x0 + (x1 - x0) / 4, y0 + (y1 - y0) / 4])
-        new_joints.append([x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2])
-        new_joints.append([x0 + (x1 - x0) * 0.75, y0 + (y1 - y0) * 0.75])
+        new_joints.append([int(x0 + (x1 - x0) / 4), int(y0 + (y1 - y0) / 4)])
+        new_joints.append([int(x0 + (x1 - x0) / 2), int(y0 + (y1 - y0) / 2)])
+        new_joints.append([int(x0 + (x1 - x0) * 0.75), int(y0 + (y1 - y0) * 0.75)])
         new_joints.append([x1,y1])
     elif nums==3:
         x0 = joints[0][0]
@@ -83,9 +86,9 @@ def midUpsample(joints):
         x2 = joints[2][0]
         y2 = joints[2][1]
         new_joints.append([x0, y0])
-        new_joints.append([x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2])
+        new_joints.append([int(x0 + (x1 - x0) / 2), int(y0 + (y1 - y0) / 2)])
         new_joints.append([x1, y1])
-        new_joints.append([x1 + (x2 - x1) / 2, y1 + (y2 - y1) / 2])
+        new_joints.append([int(x1 + (x2 - x1) / 2), int(y1 + (y2 - y1) / 2)])
         new_joints.append([x2, y2])
     elif nums == 4:
         x0 = joints[0][0]
@@ -97,11 +100,11 @@ def midUpsample(joints):
         x3 = joints[3][0]
         y3 = joints[3][1]
         new_joints.append([x0, y0])
-        new_joints.append([x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2])
+        new_joints.append([int(x0 + (x1 - x0) / 2), int(y0 + (y1 - y0) / 2)])
         new_joints.append([x1, y1])
-        new_joints.append([x1 + (x2 - x1) / 2, y1 + (y2 - y1) / 2])
+        new_joints.append([int(x1 + (x2 - x1) / 2), int(y1 + (y2 - y1) / 2)])
         new_joints.append([x2, y2])
-        new_joints.append([x2 + (x3 - x2) / 2, y2 + (y3 - y2) / 2])
+        new_joints.append([int(x2 + (x3 - x2) / 2), int(y2 + (y3 - y2) / 2)])
         new_joints.append([x3, y3])
     elif nums == 5 :
         x0 = joints[0][0]
@@ -115,13 +118,13 @@ def midUpsample(joints):
         x4 = joints[4][0]
         y4 = joints[4][1]
         new_joints.append([x0, y0])
-        new_joints.append([x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2])
+        new_joints.append([int(x0 + (x1 - x0) / 2), int(y0 + (y1 - y0) / 2)])
         new_joints.append([x1, y1])
-        new_joints.append([x1 + (x2 - x1) / 2, y1 + (y2 - y1) / 2])
+        new_joints.append([int(x1 + (x2 - x1) / 2), int(y1 + (y2 - y1) / 2)])
         new_joints.append([x2, y2])
-        new_joints.append([x2 + (x3 - x2) / 2, y2 + (y3 - y2) / 2])
+        new_joints.append([int(x2 + (x3 - x2) / 2), int(y2 + (y3 - y2) / 2)])
         new_joints.append([x3, y3])
-        new_joints.append([x3 + (x4 - x3) / 2, y3 + (y4 - y3) / 2])
+        new_joints.append([int(x3 + (x4 - x3) / 2), int(y3 + (y4 - y3) / 2)])
         new_joints.append([x4, y4])
     elif nums == 6 :
         x0 = joints[0][0]
@@ -137,15 +140,15 @@ def midUpsample(joints):
         x5 = joints[5][0]
         y5 = joints[5][1]
         new_joints.append([x0, y0])
-        new_joints.append([x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2])
+        new_joints.append([int(x0 + (x1 - x0) / 2), int(y0 + (y1 - y0) / 2)])
         new_joints.append([x1, y1])
-        new_joints.append([x1 + (x2 - x1) / 2, y1 + (y2 - y1) / 2])
+        new_joints.append([int(x1 + (x2 - x1) / 2), int(y1 + (y2 - y1) / 2)])
         new_joints.append([x2, y2])
-        new_joints.append([x2 + (x3 - x2) / 2, y2 + (y3 - y2) / 2])
+        new_joints.append([int(x2 + (x3 - x2) / 2), int(y2 + (y3 - y2) / 2)])
         new_joints.append([x3, y3])
-        new_joints.append([x3 + (x4 - x3) / 2, y3 + (y4 - y3) / 2])
+        new_joints.append([int(x3 + (x4 - x3) / 2), int(y3 + (y4 - y3) / 2)])
         new_joints.append([x4, y4])
-        new_joints.append([x4 + (x5 - x4) / 2, y4 + (y5 - y4) / 2])
+        new_joints.append([int(x4 + (x5 - x4) / 2), int(y4 + (y5 - y4) / 2)])
         new_joints.append([x5, y5])
     else:
         new_joints = joints
@@ -172,3 +175,26 @@ def overlap(box1, box2):
         return False
     else:
         return True
+
+
+def magnetXY(binary, candidate):
+    n, m = binary.shape
+
+    final_res = List()
+    for ansy, ansx in candidate:
+        if (ansx < 0) or (ansx >= n) or (ansy < 0) or (ansy >= m):
+            continue
+        if (binary[ansx, ansy] == 0):
+            tmp, tmpdist = (-1, -1), -1.0
+            for dx in range(max(-10, -ansx), min(+11, n - ansx)):
+                for dy in range(max(-10, -ansy), min(+11, m - ansy)):
+                    ansx_, ansy_ = ansx + dx, ansy + dy
+                    curdist = math.sqrt(dx ** 2 + dy ** 2)
+                    if (binary[ansx_, ansy_] == 1) and ((tmpdist < 0) or (curdist < tmpdist)):
+                        tmp, tmpdist = (ansx_, ansy_), curdist
+            if (tmpdist > 0):
+                final_res.append(tmp)
+        else:
+            final_res.append((ansy, ansx))
+
+    return final_res

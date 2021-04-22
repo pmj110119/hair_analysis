@@ -44,7 +44,7 @@ def remove_hair(binary, path, width = 10):
     # cv2.destroyAllWindows()
     return (dst > 50).astype(np.uint8)
 
-def skeletonExtraction_single(img_binary, endpoints = None, refind = False, thres = 0.05, min_length = 30):
+def skeletonExtraction_single(img_binary, endpoints = None, refind = False, thres = 0.05, min_length = 30, max_num_endpoints = 20):
     """
         输入二值图，返回一根毛发。
     """
@@ -61,7 +61,7 @@ def skeletonExtraction_single(img_binary, endpoints = None, refind = False, thre
         endpoints = np.array(endpoints)
     endpoints = endpoints.astype(np.int32)  
     N = len(endpoints)
-    if (N < 2):
+    if (N < 2) or (N > max_num_endpoints):
         return None, np.inf
  
     # 利用距离变换，设置每个点的权值
@@ -84,7 +84,7 @@ def skeletonExtraction_single(img_binary, endpoints = None, refind = False, thre
                     continue
                 if (cur_score < score):
                     path, score = cur_path, cur_score
-                                    
+    
     return path, score
 
 def skeletonExtraction(img_binary, endpoints = None, debug = False, single_hair_mode = False, refind = False, 

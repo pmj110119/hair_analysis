@@ -17,8 +17,9 @@ class AuthorWindow(QMainWindow):
                 Image.open('assets/img4.jpg'),
                 Image.open('assets/img5.jpg'),
                 Image.open('assets/img6.jpg'),
-                Image.open('assets/img7.jpg')]
-        labels = [self.img1,self.img2,self.img3,self.img4,self.img5,self.img6,self.img7]
+                Image.open('assets/img7.jpg'),
+                Image.open('assets/img8.jpg')]
+        labels = [self.img1,self.img2,self.img3,self.img4,self.img5,self.img6,self.img7,self.img8]
 
         for src,label in zip(imgs,labels):
             img = cv2.resize(np.array(src), (128, 174))

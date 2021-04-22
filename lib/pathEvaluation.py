@@ -8,7 +8,7 @@ def evaluate_path(path, local_angle_thres = np.pi / 2):
     """
     path = path.astype(np.float32)
     N = len(path)
-    if (N <= 15):
+    if (N <= 25):
         return np.inf
     dirs = path[10:, :] - path[:-10, :]
 
