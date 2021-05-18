@@ -39,7 +39,7 @@ def findNearest(a, a0):
     return a.flat[idx]
 
 # 计算毛发统计信息
-def analysisInf(width_count,offset=0):
+def analysisInf(width_count,pixel_width,offset=0,area=1):
     temp = []
     for width, nums in enumerate(width_count):
         for i in range(int(nums)):
@@ -48,19 +48,21 @@ def analysisInf(width_count,offset=0):
 
     num = int(width_count.sum())
     if num>0:
+        density = str(float(num)/area)
         num = str(num)
-        median = str(np.median(temp))
-        mean = str(format(np.mean(temp), '.2f'))
-        std = str(format(np.std(temp), '.2f'))
-        mode = str(np.argmax(np.bincount(temp)))
+        median = str(np.median(temp)*pixel_width) 
+        mean = str(format(np.mean(temp)*pixel_width, '.2f'))
+        std = str(format(np.std(temp)*pixel_width, '.2f'))
+        mode = str(format(np.argmax(np.bincount(temp))*pixel_width, '.2f'))
     else:
+        density = '0'
         num = '0'
         median = '0'
         mean = '0'
         std = '0'
         mode = '0'
 
-    return {'num':num, 'median':median, 'mean':mean, 'std':std, 'mode':mode}
+    return {'num':num, 'median':median, 'mean':mean, 'std':std, 'mode':mode, 'density':density}
 
 # 扩充骨架点————权宜之计，待改
 def midUpsample(joints):

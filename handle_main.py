@@ -218,6 +218,8 @@ class Mark(QMainWindow):
         self.waitForSegmentation = False
 
 
+        self.img_area = float(self.statusArea.text())
+        self.pixel_width = 1e6 * self.img_area/2048/2560  # 以um为单位
 
         self.initUI()
 
@@ -386,6 +388,7 @@ class Mark(QMainWindow):
 
         self.buttonImpaint.clicked.connect(self.buttonImpaintEvent)
 
+        self.statusArea.returnPressed.connect(self.areaChanged)
 
 
         self.innerClear()
@@ -735,18 +738,16 @@ class Mark(QMainWindow):
             if (width > 30):  # 暂时认为不存在超过30宽度的毛发，后面改成自适应数组
                 continue
             self.width_count[int(width)] += 1
-        inf = analysisInf(self.width_count[:self.distinguishValue])
+        inf = analysisInf(self.width_count[:self.distinguishValue], self.pixel_width, area=self.img_area)
         self.statusNum.setText(inf['num'])
-        self.statusMedian.setText(inf['median'])
         self.statusMean.setText(inf['mean'])
-        self.statusStd.setText(inf['std'])
         self.statusMode.setText(inf['mode'])
-        inf = analysisInf(self.width_count[self.distinguishValue:], offset=self.distinguishValue)
+        self.statusDensity.setText(inf['density'])
+        inf = analysisInf(self.width_count[self.distinguishValue:], self.pixel_width, offset=self.distinguishValue,area=self.img_area)
         self.statusNum_2.setText(inf['num'])
-        self.statusMedian_2.setText(inf['median'])
         self.statusMean_2.setText(inf['mean'])
-        self.statusStd_2.setText(inf['std'])
         self.statusMode_2.setText(inf['mode'])
+        self.statusDensity_2.setText(inf['density'])
 
         # 显示直方图
         self.plot_widget.clear()
@@ -1011,6 +1012,13 @@ class Mark(QMainWindow):
         self.binary_close = int(value)
         self.imshow(update=True)
 
+
+    def areaChanged(self):
+        self.img_area = float(self.statusArea.text())
+        if self.image_origin is not None:
+            self.pixel_width = 1e6 * self.img_area/self.image_origin.shape[0]/self.image_origin.shape[1]  # 以um为单位
+        self.statusArea.clearFocus()
+        self.updateAnalysis()
 
     # 子线程1：拔毛
     def buttonImpaintEvent(self):
