@@ -18,21 +18,6 @@
     <item>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
-       <widget class="QLabel" name="label_5">
-        <property name="font">
-         <font>
-          <pointsize>15</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>本软件xxxxxxxxxxxxxxxxx
- 文稿待定xxxxxxxx
-
-联系方式：xxxxxxxxxxxxx@xxxxxxxxxxx</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <layout class="QGridLayout" name="gridLayout" rowstretch="0,0,1,3,1,4,1,1,3,1">
         <item row="5" column="2">
          <widget class="QLabel" name="img4">
@@ -105,9 +90,9 @@
          </spacer>
         </item>
         <item row="7" column="3" rowspan="2">
-         <widget class="QLabel" name="img7">
+         <widget class="QLabel" name="img8">
           <property name="text">
-           <string>张珏</string>
+           <string>王珏</string>
           </property>
          </widget>
         </item>
@@ -131,7 +116,7 @@
            </font>
           </property>
           <property name="text">
-           <string>张珏</string>
+           <string>王珏</string>
           </property>
          </widget>
         </item>
@@ -229,6 +214,25 @@
            </size>
           </property>
          </spacer>
+        </item>
+        <item row="7" column="2" rowspan="2">
+         <widget class="QLabel" name="img7">
+          <property name="text">
+           <string>张珏</string>
+          </property>
+         </widget>
+        </item>
+        <item row="9" column="2">
+         <widget class="QLabel" name="label_5">
+          <property name="font">
+           <font>
+            <pointsize>15</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>张珏</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>

@@ -159,6 +159,8 @@ def unet(in_channels, out_channels):
     return UNetFactory(encoder_blocks, decoder_blocks, bridge)
 
 
+
+
 def unet_resnet(resnet_type, in_channels, out_channels, pretrained=True):
     """
     利用resnet作为encoder，相应地，decoder也做一些改动，使得输出的尺寸跟原始的一致

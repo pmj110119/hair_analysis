@@ -1,0 +1,13 @@
+/build/
+/1.1/
+/__pycache__/
+/.vscode/
+/data/
+/dist/
+*.rar
+*.spec
+*.pth
+*.jpg
+*.json
+*.png
+*.exe

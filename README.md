@@ -83,8 +83,7 @@ class MyProcess(BasicProcess):
 # 打包exe
 
 ```bash
-pyinstaller -F main.py --hidden-import=torchvision --
-hidden-import=scipy  --paths E:\anaconda3\envs\py36\Lib\site-packages\scipy\.libs
+pyinstaller -F main.py --hidden-import=torchvision --hidden-import=scipy  --paths E:\anaconda3\envs\py36\Lib\site-packages\scipy\.libs
 
 ```
 

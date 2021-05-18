@@ -44,9 +44,7 @@ from screeninfo import get_monitors
 from lib.utils import *
 from lib.process import MyProcess
 from lib.authorList import AuthorWindow
-from lib.segmentation.unet_interface import predict_binary
-from lib.segmentation.unet import unet_resnet
-import torch
+
 process = MyProcess()
 
 import matplotlib.pyplot as plt
@@ -126,23 +124,7 @@ class FullImagePlotThread(QThread):  # 步骤1.创建一个线程实例
             self.msleep(1000)
 
 #torch_device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-torch_device = torch.device('cpu')
 
-class UnetLoadThread(QThread):
-    model_signal = pyqtSignal(list)
-    def __init__(self,model_path):
-        super(UnetLoadThread, self).__init__()
-        if torch.cuda.is_available():
-            print('检测到gpu,但默认用cpu')
-        else:
-            print('未检测到gpu')
-        self.device = torch_device
-        self.model_path = model_path
-    def run(self):
-        self.model = unet_resnet('resnet34', 3, 1, False).to(self.device)
-        pre = torch.load(self.model_path, map_location=self.device)
-        self.model.load_state_dict(pre)
-        self.model_signal.emit([self.model])
 
 # class KeypointLoadThread(QThread):
 #     model_signal = pyqtSignal(list)
@@ -159,132 +141,10 @@ class UnetLoadThread(QThread):
 
 
 
-class ModelPredictThread(QThread):  # 步骤1.创建一个线程实例
-    mask_signal = pyqtSignal(np.ndarray)  # 创建一个自定义信号，元组参数
-    def __init__(self,model,img):
-        super(ModelPredictThread, self).__init__()
-        #self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.device = torch_device
-        self.model = model
-        self.img = img
-    def run(self):
-        mask = predict_binary(self.model,self.img,self.device)
-        self.mask_signal.emit(mask)  # 发射自定义信号
 
 
 
 
-
-class AutoDetectThread(QThread):  # 子线程：全图自动标注
-    mysignal = pyqtSignal(list)
-    mysignal_endpoints = pyqtSignal(list)
-    mysignal_ratio = pyqtSignal(int)
-    def __init__(self,binary,endpoints,roi=None):
-        super(AutoDetectThread, self).__init__()
-        self.binary = binary
-        self.endpoints = endpoints
-        self.roi = roi
-        self.STOP = False
-        self.OVER = True
-    def stop(self):
-        self.STOP = True
-        self.OVER = True
-    def run(self):
-        self.OVER = False
-        # 分离连通域
-        self.mysignal_ratio.emit(0)
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(self.binary.astype(np.uint8), connectivity=8)
-
-
-        if self.roi is not None:  # 提取ROI中的毛发
-            roi_indexs=[]
-            x0, x1, y0, y1 = self.roi
-            for i in range(1, num_labels):
-                x, y, width, height, area = stats[i]
-                if overlap([x0,y0,x1,y1],[x,y,x+width,y+height]): # 判断两矩形是否相交
-                    roi_indexs.append(i)
-        else:
-            roi_indexs = range(1, num_labels)
-
-
-        lengths = len(roi_indexs)
-        if lengths<20:
-            length_step = 1
-        elif lengths<100:
-            length_step = 10
-        else:
-            length_step = 20
-        temp_result = []
-        for index,i in enumerate(roi_indexs):
-            if self.STOP:
-                break
-            t1 = time.time()
-
-            x, y, width, height, area = stats[i]
-            x_min = max(x - 30, 0)
-            x_max = min(x + width + 30, self.binary.shape[1])
-            y_min = max(y - 30, 0)
-            y_max = min(y + height + 30, self.binary.shape[0])
-
-            mask = (labels[y_min:y_max,x_min:x_max] == i).astype(np.uint8)
-
-            t2 = time.time()
-            # 吸铁石
-            endpoints_inner = []
-            if self.endpoints is not None:
-                for point in self.endpoints:  # y,x
-                    x,y = point[0],point[1]
-                    if y>=y_min and y<y_max and x>=x_min and x<x_max:
-                        # tt = time.time()
-                        # point_new = magnet( self.binary,[[y,x]])
-                        # point_new = [point_new[0]
-                        # point_new[0] = np.clip(point_new[0], x_min, x_max-1)
-                        # point_new[1] = np.clip(point_new[1], y_min, y_max-1)
-                        endpoints_inner.append([y - y_min, x - x_min])
-                        #endpoints_inner.append([y - y_min, x - x_min])
-                        #print('吸铁石：',time.time()-tt)
-            if len(endpoints_inner)==0:
-                endpoints_inner = None
-            t3 = time.time()
-            # 自动识别
-            #print(endpoints_inner)
-
-            endpoints, hair_pairs = process.autoSkeletonExtraction(mask, step=10, endpoints=endpoints_inner,max_num_hairs=3)
-            t4 = time.time()
-            #
-            if len(hair_pairs)>0:
-                for joints in hair_pairs:
-                    if len(joints)>=2:
-                        dis = calculate_dis(joints[0],joints[-1])
-                        if dis<1600:
-                            continue
-                        tt = time.time()
-                        height = process.waist(joints, mask)
-                        tt2 = time.time()
-                        #print('waist:',tt2-tt)
-                        for joint_ in joints:  # 映射回原图坐标系
-                            joint_[0] = joint_[0] + x_min
-                            joint_[1] = joint_[1] + y_min
-                        mid = getMidPoint(joints)
-                        #print('geiMidPoint:', time.time() - tt2)
-                        temp_result.append({'joints': joints, 'width': height, 'mid': mid})
-                #print(index,np.linspace(0,lengths-1,20,dtype=int))
-                if index in np.linspace(0,lengths-1,20,dtype=int):
-                    self.mysignal.emit(temp_result)  # 发射自定义信号
-                    self.mysignal_ratio.emit(int(100.0*index/len(roi_indexs)))
-                    temp_result = []
-            t5 = time.time()
-            #print(t2-t1,t3-t2,t4-t3,t5-t4)
-            if DEBUG:
-                for endpoint in endpoints:
-                    endpoint = [endpoint[1], endpoint[0]]
-                    endpoint[0] = endpoint[0] + x
-                    endpoint[1] = endpoint[1] + y
-
-                self. mysignal_endpoints.emit(endpoints)
-        self.mysignal.emit(temp_result)  # 发射自定义信号
-        self.mysignal_ratio.emit(100)
-        self.OVER = True
 
 class BinaryWindow(QMainWindow):
     def __init__(self):
@@ -336,7 +196,7 @@ class Mark(QMainWindow):
         self.autoDetectRatio = 100
         # 模式选择标志
         self.show_type = BINARY
-        self.binary_type = BINARY_DL
+        self.binary_type = BINARY_AUTO
         self.downsample_ratio = 1
         # 序号
         self.handle_index=-1
@@ -360,29 +220,8 @@ class Mark(QMainWindow):
 
 
         self.initUI()
-        self.initPytorchModel()
-
-    def initPytorchModel(self):
-        self.modelLoadThread = UnetLoadThread('assets/unet.pth')
-        self.modelLoadThread.model_signal.connect(self.modelLoadedEvent)
-        self.modelLoadThread.start()  # 步骤3 子线程开始执行run函数
-
-    def modelLoadedEvent(self,model):
-        self.segmentation_model = model[0]
-        if self.waitForSegmentation:
-            self.modelPredictThread = ModelPredictThread(self.segmentation_model, self.image_origin)
-            self.modelPredictThread.mask_signal.connect(self.unetPredictEvent)
-            self.modelPredictThread.start()  # 步骤3 子线程开始执行run函数
 
 
-    def unetPredictEvent(self,mask):
-        cv2.imwrite('data/masks/'+self.tmp.split('/')[-1]+'.png',mask*255)
-        self.log('语义分割完毕')
-        self.binaryUnetSaved = True
-        self.binary_type = BINARY_DL
-        self.imshow(update=True)
-        # cv2.imshow('aaa',mask*255)
-        # cv2.waitKey(0)
 
     # 根据屏幕分辨率设置界面大小
     def setFixedUI(self):
@@ -487,9 +326,9 @@ class Mark(QMainWindow):
                       "\n   - 点击“自动识别”按钮，即可在当前ROI区域内进行毛发的自动识别"
                       "\n 4. 手动质检"
                       "\n   - 选择标注模式"
-                      "\n   - 鼠标左击，标注端点（或内点），回车键识别"
+                      "\n   - 鼠标左击，标注端点（或内点），Q键识别"
                       "\n   - 右键选中最近的毛发，WASD调整位置、方向键 ↑ ↓ 调整宽度"
-                      "\n   - 回退键删除选中的毛发"
+                      "\n   - E键删除选中的毛发"
                       "\n 5. 自动提取宽度不准时的做法"
                       "\n   - 查看二值图，切换二值图方式或调整阈值"
                       "\n   - 方向键手动调整宽度"
@@ -546,7 +385,7 @@ class Mark(QMainWindow):
      
 
         self.buttonImpaint.clicked.connect(self.buttonImpaintEvent)
-        self.buttonAutoDetect.clicked.connect(self.buttonAutoDetectEvent)
+
 
 
         self.innerClear()
@@ -1039,24 +878,6 @@ class Mark(QMainWindow):
                     self.binary_auto = closeopration(self.binary_auto,ksize=self.binary_close)
                 return self.binary_auto
 
-            elif self.binary_type==BINARY_DL:
-                if update:
-                    img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.png'
-                    dl_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
-                    _, self.binary_dl = cv.threshold(dl_output, 50, 255, cv.THRESH_BINARY)
-                    self.binary_dl = cv.resize(self.binary_dl,
-                                    (int(self.binary_dl.shape[1] / self.downsample_ratio), int(self.binary_dl.shape[0] / self.downsample_ratio)))
-                    self.binary_dl = closeopration(self.binary_dl,ksize=self.binary_close)
-                return self.binary_dl
-            elif self.binary_type==BINARY_INNER:
-                if update:
-                    img_path = 'data/masks/'+self.tmp.split('/')[-1]+'.inner.png'
-                    inner_output = cv.cvtColor(cv.imread(img_path), cv.COLOR_BGR2GRAY) # 加载预先生成的mask（后期效果好的话再把模型预测放进来）
-                    _, self.inner_output = cv.threshold(inner_output, 50, 255, cv.THRESH_BINARY)
-                    self.inner_output = cv.resize(self.inner_output,
-                                    (int(self.inner_output.shape[1] / self.downsample_ratio), int(self.inner_output.shape[0] / self.downsample_ratio)))
-                    self.inner_output = closeopration(self.inner_output,ksize=self.binary_close)
-                return self.inner_output
         except:
             # msg_box = QMessageBox(QMessageBox.Warning, '错误', '二值图加载失败，请检查是否有文件缺失')
             # msg_box.exec_()
@@ -1209,65 +1030,6 @@ class Mark(QMainWindow):
         #self.logBrowser.append()
         self.logBrowser.ensureCursorVisible()
 
-    # 子线程2：全图自动标注
-    def buttonAutoDetectEvent(self):
-        if self.autoDetectThread is not None:
-            self.autoDetectThread.stop()
-            if self.autoDetectRatio != 100:
-                self.log('自动标注中止')
-        x0,x1,y0,y1 = self.roiInf_corrected
-        if len(self.result)!=0 and (x0==0 and y0==0 and x1==self.image_origin.shape[1] and y1==self.image_origin.shape[0]):
-            reply = QMessageBox.question(self, '确认', '是否删除已标注信息，重新自动识别？',
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                self.result=[]
-                self.handle_index = -2
-                self.updateAll()
-                self.log('删除成功，重新进行自动标注...')
-                self.img_impaint = self.image_origin
-                self.imshow_small_picture()
-                try:
-                    endpoints = np.load('data/endpoints/' + self.tmp.split('/')[-1] + '.npy')
-                except:
-                    print('缺失端点npy文件')
-                    endpoints = None
-                self.autoDetectThread = AutoDetectThread(self.getBinary()/255,endpoints,self.roiInf_corrected)
-                self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
-                self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
-                self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
-
-                self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
-        else:
-            self.log('ROI区域自动标注中...')
-            try:
-                endpoints = np.load('data/endpoints/' + self.tmp.split('/')[-1] + '.npy')
-            except:
-                print('缺失端点npy文件')
-                endpoints = None
-            self.autoDetectThread = AutoDetectThread(self.getBinary() / 255, endpoints, self.roiInf_corrected)
-            self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal)
-            self.autoDetectThread.mysignal_endpoints.connect(self.autoDetectEndpointEventSignal)
-            self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal)
-
-            self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
-
-    def autoDetectEventSignal(self,temp_result):
-        self.result = temp_result + self.result #次序不能倒，否则影响handle_index
-        if self.handle_index >=0:
-            self.handle_index += len(temp_result)
-        self.imshowSingleUpdate(temp_result)
-        self.updateAnalysis()
-        self.saveJson()
-    def autoDetectRatioEventSignal(self, ratio):
-        self.autoDetectRatio = ratio
-        self.autoDetectBar.setValue(ratio)
-        if ratio==100:
-            self.log('自动标注完成!')
-            self.buttonImpaintEvent()
-
-    def autoDetectEndpointEventSignal(self,endpoints):
-        self.endpoints = endpoints
-        self.plotEndpoints(endpoints)
 
     def plotEndpoints(self,endpoints):
         self.img_plot = endpoint_plot(self.img_plot, endpoints, (255, 0, 0),alpha=self.plot_alpha)
@@ -1333,24 +1095,6 @@ class Mark(QMainWindow):
         #     self.imshow(jump=True)
 
 
-    def checkBinary(self,img_name):
-        print('data/masks/'+img_name+'.png')
-        if os.path.exists('data/masks/'+img_name+'.png'):
-            self.binaryUnetSaved = True
-            #self.log('检测到语义分割二值图')
-        else:
-            self.binaryUnetSaved = False
-            if self.segmentation_model is None:
-                self.waitForSegmentation = True
-                self.log('后台正在加载深度学习模型...')
-            else:
-                self.log('正在生成语义分割二值图...')
-               # self.getBinary(True)
-                self.binary_type = BINARY_AUTO
-                self.imshow(update=True)
-                self.modelPredictThread = ModelPredictThread(self.segmentation_model, self.image_origin)
-                self.modelPredictThread.mask_signal.connect(self.unetPredictEvent)
-                self.modelPredictThread.start()  # 步骤3 子线程开始执行run函数
 
 
     # 列表图片选取
@@ -1359,10 +1103,7 @@ class Mark(QMainWindow):
         self.waitForSegmentation = False
         self.binarySaved = False
         self.innerClear()
-        if self.autoDetectThread is not None:
-            self.autoDetectThread.stop()
-            if self.autoDetectRatio!=100:
-                self.log('自动标注中止')
+
         self.endpoints = []
         # self.distinguishValue = 0   # 二分类宽度阈值
 
@@ -1428,7 +1169,7 @@ class Mark(QMainWindow):
                                     (255, 0, 0), alpha=self.plot_alpha)
         self.fullImagePlotStart()
 
-        self.checkBinary(self.tmp.split('/')[-1])
+
 
     def checkThisHair(self):
         if self.handle_bone == True:
@@ -1499,7 +1240,7 @@ class Mark(QMainWindow):
         if self.img_loaded==False:
             return
 
-        if QKeyEvent.key() == Qt.Key_Return:  # 回车
+        if QKeyEvent.key() == Qt.Key_Q:  # 回车
             if self.handleMode==HANDLE_Q:
                 self.generateHairPath()
             elif self.handleMode==HANDLE_E:
@@ -1541,7 +1282,7 @@ class Mark(QMainWindow):
         #参数1  控件
         if(len(self.result)<1):
             return
-        if QKeyEvent.key()== Qt.Key_Backspace:  # 删除
+        if QKeyEvent.key()== Qt.Key_E:  # 删除
             if self.handleMode == HANDLE_INNER:
                 self.innerClear()
                 self.imshow()

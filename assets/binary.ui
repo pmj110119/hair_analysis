@@ -101,7 +101,7 @@ Local Adapative</string>
 Unet segmentation</string>
      </property>
      <property name="checked">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
     </widget>
     <widget class="QSlider" name="sliderBinaryNormal">
@@ -156,7 +156,7 @@ Unet segmentation</string>
     </widget>
     <widget class="QRadioButton" name="radioBinaryInner">
      <property name="enabled">
-      <bool>true</bool>
+      <bool>false</bool>
      </property>
      <property name="geometry">
       <rect>
@@ -179,7 +179,7 @@ Unet segmentation</string>
 inner growing</string>
      </property>
      <property name="checked">
-      <bool>true</bool>
+      <bool>false</bool>
      </property>
     </widget>
    </widget>
