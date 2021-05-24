@@ -48,12 +48,14 @@ def analysisInf(width_count,pixel_width,offset=0,area=1):
 
     num = int(width_count.sum())
     if num>0:
-        density = str(float(num)/area)
+        
         num = str(num)
         median = str(np.median(temp)*pixel_width) 
         mean = str(format(np.mean(temp)*pixel_width, '.2f'))
         std = str(format(np.std(temp)*pixel_width, '.2f'))
         mode = str(format(np.argmax(np.bincount(temp))*pixel_width, '.2f'))
+        density = str(format(float(num)/area, '.2f'))
+        #density = str(float(num)/area)
     else:
         density = '0'
         num = '0'
