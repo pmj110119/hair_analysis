@@ -34,9 +34,9 @@
     <widget class="QLineEdit" name="statusNum">
      <property name="geometry">
       <rect>
-       <x>130</x>
+       <x>124</x>
        <y>80</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -96,9 +96,9 @@ Mode</string>
     <widget class="QLineEdit" name="statusMode">
      <property name="geometry">
       <rect>
-       <x>130</x>
+       <x>124</x>
        <y>180</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -139,9 +139,9 @@ Mean</string>
     <widget class="QLineEdit" name="statusMean">
      <property name="geometry">
       <rect>
-       <x>130</x>
+       <x>124</x>
        <y>130</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -182,9 +182,9 @@ Mean</string>
     <widget class="QLineEdit" name="statusDensity">
      <property name="geometry">
       <rect>
-       <x>130</x>
+       <x>124</x>
        <y>230</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -206,7 +206,7 @@ Mean</string>
     <widget class="QLabel" name="label_11">
      <property name="geometry">
       <rect>
-       <x>440</x>
+       <x>470</x>
        <y>33</y>
        <width>131</width>
        <height>51</height>
@@ -225,9 +225,9 @@ Width Threshold</string>
     <widget class="QLineEdit" name="statusArea">
      <property name="geometry">
       <rect>
-       <x>130</x>
+       <x>124</x>
        <y>280</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -268,7 +268,7 @@ Area</string>
     <widget class="QSlider" name="sliderDistinguish">
      <property name="geometry">
       <rect>
-       <x>580</x>
+       <x>600</x>
        <y>50</y>
        <width>131</width>
        <height>20</height>
@@ -311,7 +311,7 @@ Area</string>
     <widget class="QLabel" name="label_16">
      <property name="geometry">
       <rect>
-       <x>241</x>
+       <x>261</x>
        <y>30</y>
        <width>101</width>
        <height>41</height>
@@ -329,9 +329,9 @@ Area</string>
     <widget class="QLineEdit" name="statusMode_2">
      <property name="geometry">
       <rect>
-       <x>248</x>
+       <x>258</x>
        <y>180</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -353,9 +353,9 @@ Area</string>
     <widget class="QLineEdit" name="statusDensity_2">
      <property name="geometry">
       <rect>
-       <x>248</x>
+       <x>258</x>
        <y>230</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -377,9 +377,9 @@ Area</string>
     <widget class="QLineEdit" name="statusNum_2">
      <property name="geometry">
       <rect>
-       <x>248</x>
+       <x>258</x>
        <y>80</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -404,9 +404,9 @@ Area</string>
      </property>
      <property name="geometry">
       <rect>
-       <x>730</x>
+       <x>750</x>
        <y>40</y>
-       <width>71</width>
+       <width>51</width>
        <height>31</height>
       </rect>
      </property>
@@ -428,9 +428,9 @@ Area</string>
     <widget class="QWidget" name="horizontalLayoutWidget">
      <property name="geometry">
       <rect>
-       <x>440</x>
+       <x>470</x>
        <y>90</y>
-       <width>361</width>
+       <width>331</width>
        <height>191</height>
       </rect>
      </property>
@@ -439,7 +439,7 @@ Area</string>
     <widget class="QLabel" name="label">
      <property name="geometry">
       <rect>
-       <x>360</x>
+       <x>390</x>
        <y>143</y>
        <width>71</width>
        <height>71</height>
@@ -476,7 +476,7 @@ Number</string>
     <widget class="QLabel" name="label_3">
      <property name="geometry">
       <rect>
-       <x>197</x>
+       <x>201</x>
        <y>280</y>
        <width>91</width>
        <height>31</height>
@@ -489,7 +489,7 @@ Number</string>
     <widget class="QLabel" name="label_4">
      <property name="geometry">
       <rect>
-       <x>192</x>
+       <x>196</x>
        <y>230</y>
        <width>51</width>
        <height>31</height>
@@ -502,7 +502,7 @@ Number</string>
     <widget class="QLabel" name="label_6">
      <property name="geometry">
       <rect>
-       <x>310</x>
+       <x>330</x>
        <y>230</y>
        <width>61</width>
        <height>31</height>
@@ -515,61 +515,61 @@ Number</string>
     <widget class="QLabel" name="label_9">
      <property name="geometry">
       <rect>
-       <x>196</x>
+       <x>200</x>
        <y>180</y>
        <width>41</width>
        <height>31</height>
       </rect>
      </property>
      <property name="text">
-      <string>um</string>
+      <string>μm</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_19">
      <property name="geometry">
       <rect>
-       <x>196</x>
+       <x>200</x>
        <y>130</y>
        <width>41</width>
        <height>31</height>
       </rect>
      </property>
      <property name="text">
-      <string>um</string>
+      <string>μm</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_20">
      <property name="geometry">
       <rect>
-       <x>314</x>
+       <x>334</x>
        <y>130</y>
        <width>41</width>
        <height>31</height>
       </rect>
      </property>
      <property name="text">
-      <string>um</string>
+      <string>μm</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_21">
      <property name="geometry">
       <rect>
-       <x>314</x>
+       <x>334</x>
        <y>180</y>
        <width>41</width>
        <height>31</height>
       </rect>
      </property>
      <property name="text">
-      <string>um</string>
+      <string>μm</string>
      </property>
     </widget>
     <widget class="QLineEdit" name="statusMean_2">
      <property name="geometry">
       <rect>
-       <x>248</x>
+       <x>258</x>
        <y>130</y>
-       <width>61</width>
+       <width>71</width>
        <height>31</height>
       </rect>
      </property>
@@ -709,7 +709,7 @@ Number</string>
         <item row="1" column="0">
          <widget class="QPushButton" name="buttonAutoDetect">
           <property name="enabled">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="font">
            <font>
