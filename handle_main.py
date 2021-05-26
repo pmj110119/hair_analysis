@@ -219,7 +219,7 @@ class Mark(QMainWindow):
 
 
         self.img_area = float(self.statusArea.text())
-        self.pixel_width = 1e6 * self.img_area/2048/2560  # 以um为单位
+        self.pixel_width = 1e4 * sqrt(self.img_area/2048/2560)  # 以um为单位
 
         self.initUI()
 
@@ -1016,7 +1016,7 @@ class Mark(QMainWindow):
     def areaChanged(self):
         self.img_area = float(self.statusArea.text())
         if self.image_origin is not None:
-            self.pixel_width = 1e6 * self.img_area/self.image_origin.shape[0]/self.image_origin.shape[1]  # 以um为单位
+            self.pixel_width = 1e4 * sqrt(self.img_area/self.image_origin.shape[0]/self.image_origin.shape[1])  # 以um为单位
         self.statusArea.clearFocus()
         self.updateAnalysis()
 

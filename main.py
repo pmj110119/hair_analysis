@@ -358,7 +358,7 @@ class Mark(QMainWindow):
         self.waitForSegmentation = False
 
         self.img_area = float(self.statusArea.text())
-        self.pixel_width = 1e6 * self.img_area / 2048 / 2560  # 以um为单位
+        self.pixel_width = 1e4 * sqrt(self.img_area / 2048 / 2560)  # 以um为单位
 
         self.initUI()
         self.initPytorchModel()
@@ -1195,7 +1195,7 @@ class Mark(QMainWindow):
     def areaChanged(self):
         self.img_area = float(self.statusArea.text())
         if self.image_origin is not None:
-            self.pixel_width = 1e6 * self.img_area/self.image_origin.shape[0]/self.image_origin.shape[1]  # 以um为单位
+            self.pixel_width = 1e4 * sqrt(self.img_area/self.image_origin.shape[0]/self.image_origin.shape[1])  # 以um为单位
         self.statusArea.clearFocus()
         self.updateAnalysis()
 
@@ -1507,7 +1507,7 @@ class Mark(QMainWindow):
         if self.img_loaded==False:
             return
 
-        if QKeyEvent.key() == Qt.Key_Return:  # 回车
+        if QKeyEvent.key() == Qt.Key_Q:  # 回车
             if self.handleMode==HANDLE_Q:
                 self.generateHairPath()
             elif self.handleMode==HANDLE_E:
@@ -1549,7 +1549,7 @@ class Mark(QMainWindow):
         #参数1  控件
         if(len(self.result)<1):
             return
-        if QKeyEvent.key()== Qt.Key_Backspace:  # 删除
+        if QKeyEvent.key()== Qt.Key_E:  # 删除
             if self.handleMode == HANDLE_INNER:
                 self.innerClear()
                 self.imshow()
