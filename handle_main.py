@@ -28,6 +28,7 @@ import qdarkstyle
 import sys
 import cv2 as cv
 import os
+import shutil
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas    # matplotlib画图用
 import numpy as np
 import json
@@ -48,7 +49,7 @@ from lib.authorList import AuthorWindow
 process = MyProcess()
 
 import matplotlib.pyplot as plt
-
+from natsort import ns, natsorted
 
 DEBUG = False
 
@@ -356,18 +357,24 @@ class Mark(QMainWindow):
         cv.imwrite('data/dataset/full_masks/'+os.path.basename(self.tmp).split('.')[0]+'.png',binary)
 
 
+    def loadImgList(self):
+        # 加载所有图片名并添加到列表中
+        self.allFiles.clear()
+        allImgs = glob.glob(imgPath + '*.jpg')
+        allImgs += glob.glob(imgPath + '*.png')
+       # allImgs = sorted(allImgs)  # 文件名按字母排序
+        allImgs = natsorted(allImgs, alg=ns.PATH)  # 要加alg=ns.PATH参数才和windows系统名称排序一致
+
+        for imgTmp in allImgs:
+            self.allFiles.addItem(os.path.basename(imgTmp))  # 将此文件添加到列表中
+
     def initUI(self):
 
         # 值的初始化
         self.binary_threshold_normal = 140
         self.binary_threshold_auto = 5
         self.binary_close = 3
-        # 加载所有图片名并添加到列表中
-        allImgs = glob.glob(imgPath+'*.jpg')
-
-        allImgs += glob.glob(imgPath + '*.png')
-        for imgTmp in allImgs:
-            self.allFiles.addItem(os.path.basename(imgTmp))   # 将此文件添加到列表中
+        self.loadImgList()
         self.allFiles.itemClicked.connect(self.itemClick)   #列表框关联时间，用信号槽的写法方式不起作用
 
         self.sliderDistinguish.valueChanged.connect(self.distinguishUpdate)
@@ -387,6 +394,8 @@ class Mark(QMainWindow):
      
 
         self.buttonImpaint.clicked.connect(self.buttonImpaintEvent)
+
+        self.buttonImportImage.clicked.connect(self.importImage)
 
         self.statusArea.returnPressed.connect(self.areaChanged)
 
@@ -1039,6 +1048,13 @@ class Mark(QMainWindow):
         self.logBrowser.ensureCursorVisible()
 
 
+    def importImage(self):
+        files = QtWidgets.QFileDialog.getOpenFileNames(self, "选取文件", "./", "img Files (*.jpg *.png *.jpeg *.tif *.tiff)")[0]
+        for file in files:
+            shutil.copy(file,'./data/imgs')
+        self.loadImgList()
+        #print(files)
+
     def plotEndpoints(self,endpoints):
         self.img_plot = endpoint_plot(self.img_plot, endpoints, (255, 0, 0),alpha=self.plot_alpha)
 
@@ -1049,10 +1065,11 @@ class Mark(QMainWindow):
         plt.figure()
         plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
         num_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-        plt.bar(num_list, self.width_count[:20], color="lightseagreen", tick_label=num_list)
+        color_ = ["indianred"]*self.distinguishValue+["dodgerblue"]*(len(num_list)-self.distinguishValue)
+        plt.bar(num_list, self.width_count[:20], color=color_, tick_label=num_list)
         for a, b in zip(num_list, self.width_count[:20]):
             plt.text(a, b + 0.1, b, ha='center', va='bottom')  # 每个柱顶部显示数值
-        plt.xlabel('宽度')
+        plt.xlabel('宽度'+' (1pixel='+'%.4f'%self.pixel_width+'um)')
         plt.ylabel('数量')
         plt.title(os.path.basename(self.tmp.split('.')[0]))
         plt.show()
@@ -1108,21 +1125,21 @@ class Mark(QMainWindow):
     # 列表图片选取
     def itemClick(self):  #列表框单击事件
         self.handle_index = -2
-        self.waitForSegmentation = False
         self.binarySaved = False
         self.innerClear()
-
         self.endpoints = []
         # self.distinguishValue = 0   # 二分类宽度阈值
 
 
         self.tmp = imgPath + self.allFiles.currentItem().text()  #图像的绝对路径
         src = cv.imread(str(self.tmp),1)      #读取图像
+        src = cv.resize(src, (2560,2048))
+
         self.widthHeightRatio = src.shape[1]/src.shape[0]
 
         if src.shape[0]<1024:
             self.downsample_ratio = 1
-        src = cv.resize(src,(int(src.shape[1]/self.downsample_ratio),int(src.shape[0]/self.downsample_ratio)))
+
 
 
 
@@ -1143,11 +1160,6 @@ class Mark(QMainWindow):
 
 
         self.image_origin = src.copy()
-
-
-
-
-
         self.img_plot = src.copy()
         # 怎么在修改分辨率时不重新加载？？
         self.img_impaint = src.copy()
@@ -1176,6 +1188,9 @@ class Mark(QMainWindow):
         self.img_plot = curve_plot(self.image_origin, self.result, self.distinguishValue / self.downsample_ratio,
                                     (255, 0, 0), alpha=self.plot_alpha)
         self.fullImagePlotStart()
+
+
+
 
 
 
