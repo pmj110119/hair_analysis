@@ -53,7 +53,8 @@ def predict_binary(model, img, device):
     curve = np.zeros([h, w], dtype=np.uint8)
     model.eval()
     with torch.no_grad():  # 不进行反向传播
-        for (x1, x2, y1, y2) in slices:
+        for index,(x1, x2, y1, y2) in enumerate(slices):
+            #print(index/len(slices))
             patch = img[x1:x2, y1:y2, :]
             patch = img2tensor((patch - patch.mean()) / patch.std())
             patch = patch.unsqueeze(0).to(device)

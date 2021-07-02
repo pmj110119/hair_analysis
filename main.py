@@ -18,6 +18,7 @@
 #     ```` ':.          ':::::::::'                  ::::..
 #                        '.:::::'                    ':'````..
 #                     美女保佑 永无BUG
+import collections
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtCore import Qt,QEvent
@@ -162,6 +163,13 @@ class UnetLoadThread(QThread):
 #         self.model_signal.emit([self.model])  # 发射自定义信号
 
 
+class BatchProcess(QThread):
+    def __init__(self):
+        super(BatchProcess, self).__init__()
+
+    def run(self):
+        mask = predict_binary(self.model,self.img,self.device)
+        self.mask_signal.emit(mask)  # 发射自定义信号
 
 class ModelPredictThread(QThread):  # 步骤1.创建一个线程实例
     mask_signal = pyqtSignal(np.ndarray)  # 创建一个自定义信号，元组参数
@@ -174,6 +182,7 @@ class ModelPredictThread(QThread):  # 步骤1.创建一个线程实例
     def run(self):
         mask = predict_binary(self.model,self.img,self.device)
         self.mask_signal.emit(mask)  # 发射自定义信号
+        print('emit over!!')
 
 
 
@@ -183,6 +192,7 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
     mysignal = pyqtSignal(list)
     mysignal_endpoints = pyqtSignal(list)
     mysignal_ratio = pyqtSignal(int)
+    mysignal_over = pyqtSignal(int)
     def __init__(self,binary,endpoints,roi=None):
         super(AutoDetectThread, self).__init__()
         self.binary = binary
@@ -288,6 +298,7 @@ class AutoDetectThread(QThread):  # 子线程：全图自动标注
                 self. mysignal_endpoints.emit(endpoints)
         self.mysignal.emit(temp_result)  # 发射自定义信号
         self.mysignal_ratio.emit(100)
+        self.mysignal_over.emit(1)
         self.OVER = True
 
 class BinaryWindow(QMainWindow):
@@ -374,6 +385,7 @@ class Mark(QMainWindow):
 
     def modelLoadedEvent(self,model):
         self.segmentation_model = model[0]
+        self.log('AI模型加载完毕！')
         if self.waitForSegmentation:
             self.modelPredictThread = ModelPredictThread(self.segmentation_model, self.image_origin)
             self.modelPredictThread.mask_signal.connect(self.unetPredictEvent)
@@ -381,8 +393,10 @@ class Mark(QMainWindow):
 
 
     def unetPredictEvent(self,mask):
+        print('语义分割完毕')
         cv2.imwrite('data/masks/'+self.tmp.split('/')[-1]+'.png',mask*255)
         self.log('语义分割完毕')
+        
         self.binaryUnetSaved = True
         self.binary_type = BINARY_DL
         self.imshow(update=True)
@@ -410,10 +424,6 @@ class Mark(QMainWindow):
         self.menubar = self.menuBar()  # 获取窗体的菜单栏
 
         self.menu = self.menubar.addMenu(" 文件 ")
-        # # 批处理
-        # self.batchMenu = QAction("批处理", self)
-        # self.batchMenu.triggered.connect(self.batch_operation)
-        # self.menu.addAction(self.batchMenu)
 
         # 二值化调整
         self.binaryMenu = QAction("二值图调整", self)
@@ -432,12 +442,16 @@ class Mark(QMainWindow):
         self.exportCSV.triggered.connect(self.buttonSaveEvent)
         self.menu.addAction(self.exportCSV)
         #self.file.triggered[QAction].connect(self.processtrigger)
+        # 批处理
+        self.autoBatch = QAction("批量自动识别", self)
+        self.autoBatch.setShortcut("Ctrl+a")  # 设置快捷键
+        self.autoBatch.triggered.connect(self.batch)
+        self.menu.addAction(self.autoBatch)
         # # 导出二值图
         # self.binarySave = QAction("导出二值图", self)
         # self.binarySave.setShortcut("Ctrl+a")  # 设置快捷键
         # self.binarySave.triggered.connect(self.saveBinary)
         # self.menu.addAction(self.binarySave)
-
 
 
 
@@ -1280,12 +1294,22 @@ class Mark(QMainWindow):
         self.imshowSingleUpdate(temp_result)
         self.updateAnalysis()
         self.saveJson()
+    def autoDetectEventSignal_batch(self,temp_result):
+        self.result = temp_result + self.result #次序不能倒，否则影响handle_index
+        self.saveJson()
+
     def autoDetectRatioEventSignal(self, ratio):
         self.autoDetectRatio = ratio
         self.autoDetectBar.setValue(ratio)
         if ratio==100:
             self.log('自动标注完成!')
             self.buttonImpaintEvent()
+    def autoDetectRatioEventSignal_batch(self, ratio):
+        self.autoDetectRatio = ratio
+        self.autoDetectBar.setValue(ratio)
+        if ratio==100:
+            self.log('自动标注完成!')
+
 
     def autoDetectEndpointEventSignal(self,endpoints):
         self.endpoints = endpoints
@@ -1365,8 +1389,10 @@ class Mark(QMainWindow):
             self.binaryUnetSaved = False
             if self.segmentation_model is None:
                 self.waitForSegmentation = True
+                print('后台正在加载深度学习模型...')
                 self.log('后台正在加载深度学习模型...')
             else:
+                print('正在生成语义分割二值图...')
                 self.log('正在生成语义分割二值图...')
                # self.getBinary(True)
                 self.binary_type = BINARY_AUTO
@@ -1375,9 +1401,57 @@ class Mark(QMainWindow):
                 self.modelPredictThread.mask_signal.connect(self.unetPredictEvent)
                 self.modelPredictThread.start()  # 步骤3 子线程开始执行run函数
 
+    def batch(self):
+        if not self.segmentation_model:
+            msg_box = QMessageBox(QMessageBox.Warning, '出错', '请等待AI模型加载完毕！')
+            msg_box.exec_()
+        self.batchItems = collections.deque()
 
+        for i in range(self.allFiles.count()):
+            item = self.allFiles.item(i)
+            self.batchItems.append(item)
+            
+        self.batchNextProcess()
+  
+        
+
+    def batchNextProcess(self):
+        if not self.batchItems:
+            self.log('>>>> 批处理完成')
+            return
+        item = self.batchItems.popleft()
+        self.log('处理'+item.text())
+        self.allFiles.setCurrentItem(item)
+        self.itemClick(batch=True)
+        if os.path.exists('data/masks/'+self.tmp.split('/')[-1]+'.png'):
+            self.binaryUnetSaved = True
+        else:
+            self.binaryUnetSaved = False
+            mask = predict_binary(self.segmentation_model,self.image_origin,torch_device)
+            self.unetPredictEvent(mask)
+            
+        if self.autoDetectThread is not None:
+            self.autoDetectThread.stop()
+            if self.autoDetectRatio != 100:
+                self.log('自动标注中止')
+
+        self.result=[]
+        self.handle_index = -2
+        self.updateAll()
+        self.log('删除成功，重新进行自动标注...')
+        self.img_impaint = self.image_origin
+        try:
+            endpoints = np.load('data/endpoints/' + self.tmp.split('/')[-1] + '.npy')
+        except:
+            print('缺失端点npy文件')
+            endpoints = None
+        self.autoDetectThread = AutoDetectThread(self.getBinary()/255,endpoints)
+        self.autoDetectThread.mysignal.connect(self.autoDetectEventSignal_batch)
+        self.autoDetectThread.mysignal_ratio.connect(self.autoDetectRatioEventSignal_batch)
+        self.autoDetectThread.mysignal_over.connect(self.batchNextProcess)
+        self.autoDetectThread.start()  # 步骤3 子线程开始执行run函数
     # 列表图片选取
-    def itemClick(self):  #列表框单击事件
+    def itemClick(self,batch=False):  #列表框单击事件
         self.handle_index = -2
         self.waitForSegmentation = False
         self.binarySaved = False
@@ -1425,8 +1499,8 @@ class Mark(QMainWindow):
 
         # 缩略图展示
         self.roi_size = (self.labelImg_roi.width(), self.labelImg_roi.height())
-        self.roi_window = 512
-        self.roiInf = [0.5,0.5,self.roi_window]
+        self.roi_window = 2560
+        self.roiInf = [0.0,0.0,self.roi_window]
         self.roiUpdate()
         self.imshow_small_picture()
 
@@ -1448,7 +1522,8 @@ class Mark(QMainWindow):
                                     (255, 0, 0), alpha=self.plot_alpha)
         self.fullImagePlotStart()
 
-        self.checkBinary(self.tmp.split('/')[-1])
+        if not batch:
+            self.checkBinary(self.tmp.split('/')[-1])
 
     def checkThisHair(self):
         if self.handle_bone == True:

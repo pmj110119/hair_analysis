@@ -2,6 +2,7 @@
 /1.2/
 /__pycache__/
 /.vscode/
+/.idea/
 /data/
 /dist/
 *.rar
@@ -12,3 +13,9 @@
 *.png
 *.exe
 *.csv
+*.zip
+batchProcess.py
+handle_main2.py
+/testdata20210624/
+优化问题.md
+*.assets
